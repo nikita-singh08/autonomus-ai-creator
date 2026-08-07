@@ -322,3 +322,96 @@ This is only Milestone 1.
 - Prisma setup
 - API placeholders
 - Folder structure
+
+## Prompt 3
+
+**Tool:** Antigravity
+
+**Purpose:**
+Implement Prisma schema and POST /api/agent/init.
+
+**Prompt:**
+```text
+You are continuing an existing codebase.
+
+DO NOT redesign the project.
+
+Follow the existing architecture already present in the repository.
+
+Current milestone:
+
+Implement ONLY the persistence layer and the agent initialization endpoint.
+
+Tasks:
+
+1. Complete prisma/schema.prisma.
+
+Create these models:
+
+- Agent
+- Persona
+- Topic
+- Post
+- Source
+- TickLog
+
+Use proper Prisma relations.
+
+2. Generate the Prisma client configuration.
+
+3. Implement POST /api/agent/init
+
+Input:
+
+{
+  "persona": {
+    "name": "Ada",
+    "domain": "AI Security"
+  }
+}
+
+Behavior:
+
+- Create Agent
+- Create Persona version 1
+- Link Agent → Persona
+- Return
+
+{
+  "agentId":"..."
+}
+
+4. Validation
+
+Return 400 if persona is missing.
+
+5. Keep all business logic inside src/agent.
+
+API routes should remain thin.
+
+DO NOT IMPLEMENT:
+
+- feed endpoint
+- scheduler
+- RSS
+- memory
+- LLM
+- publishing
+- dashboard
+
+Stop after this milestone.
+```
+
+
+**Result:**
+- Added database schema
+- Implemented Agent initialization API
+- Added validation
+- Created migration
+
+**Review:**
+Verified migration and endpoint behavior before commit.
+
+**Commit:**
+feat: implement agent initialization and database schema
+
