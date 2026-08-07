@@ -415,3 +415,107 @@ Verified migration and endpoint behavior before commit.
 **Commit:**
 feat: implement agent initialization and database schema
 
+## Prompt 4
+
+### Tool
+Antigravity
+
+### Purpose
+Implement the feed retrieval endpoint (`GET /api/agent/feed`) using the existing Prisma models and architecture.
+
+### Prompt
+
+```text
+You are continuing an existing codebase.
+
+Do NOT redesign anything.
+
+Follow the existing architecture already present in the repository.
+
+Current milestone:
+
+Implement ONLY the feed retrieval endpoint.
+
+Requirements:
+
+1. Implement
+
+GET /api/agent/feed?agentId=<id>
+
+2. Read published posts from Prisma.
+
+3. Return
+
+{
+  "posts":[
+    {
+      "id":"",
+      "createdAt":"",
+      "text":"",
+      "rationale":"",
+      "sources":[]
+    }
+  ]
+}
+
+4. Order posts by
+
+createdAt DESC
+
+(newest first)
+
+5. If the agent has no posts
+
+return
+
+{
+   "posts":[]
+}
+
+6. Return HTTP 400 if
+
+agentId is missing.
+
+7. Keep API routes thin.
+
+Move all business logic into
+
+src/agent
+
+or
+
+src/lib
+
+Do not duplicate logic.
+
+DO NOT IMPLEMENT
+
+- RSS
+- Topic discovery
+- Scheduler
+- LLM
+- Publishing
+- Memory
+- Dashboard
+
+Stop after this milestone.
+```
+
+### Output Used
+- Implemented `GET /api/agent/feed`
+- Retrieved posts from the database
+- Ordered posts by `createdAt` (newest first)
+- Returned an empty `posts` array when no posts exist
+- Added validation for missing `agentId`
+- Kept API routes thin and moved business logic to the agent layer
+
+### Human Review
+- Verified `GET /api/agent/feed?agentId=<id>` returns the expected response.
+- Verified missing `agentId` returns an HTTP 400 error.
+- Reviewed generated code before committing.
+
+### Commit
+
+```text
+feat: implement feed retrieval endpoint
+```
