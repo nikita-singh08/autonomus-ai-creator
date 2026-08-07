@@ -2,21 +2,19 @@
 // Prisma client singleton — prevents multiple connections in
 // development (Next.js hot-reload creates new module instances)
 // ============================================================
-// NOTE: Prisma 7 moves datasource URL config to prisma.config.ts.
-// At runtime the PrismaClient still reads DATABASE_URL via the
-// @prisma/adapter-pg driver adapter for the actual queries.
+// Uses @prisma/adapter-better-sqlite3 for Prisma 7 driver-adapter mode.
+// better-sqlite3 is a native module — excluded from Next.js bundling via
+// serverExternalPackages in next.config.ts.
 
 import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { Pool } from "pg";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+
+// DATABASE_URL is read from .env / .env.local by Next.js at startup.
+// The fallback matches prisma.config.ts so migrate and runtime use the same file.
+const DATABASE_URL = process.env.DATABASE_URL ?? "file:./prisma/dev.db";
 
 function makePrismaClient(): PrismaClient {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new Error("DATABASE_URL environment variable is not set");
-  }
-  const pool = new Pool({ connectionString });
-  const adapter = new PrismaPg(pool);
+  const adapter = new PrismaBetterSqlite3({ url: DATABASE_URL });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return new PrismaClient({ adapter } as any);
 }

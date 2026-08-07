@@ -117,14 +117,17 @@ export interface CriticResult {
 // --------------- API request/response shapes -----------------
 
 /** POST /api/agent/init */
+export interface InitPersonaInput {
+  name: string;
+  domain: string;
+}
+
 export interface InitAgentRequest {
-  name?: string;
-  domain?: string;
+  persona?: InitPersonaInput;
 }
 
 export interface InitAgentResponse {
   agentId: string;
-  personaId: string;
 }
 
 /** GET /api/agent/feed */
