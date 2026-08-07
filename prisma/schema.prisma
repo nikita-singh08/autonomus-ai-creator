@@ -1,0 +1,102 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// Agent — top-level identity record
+// ============================================================
+model Agent {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  personaId String   // FK to the current active Persona version
+
+  persona  Persona   @relation("CurrentPersona", fields: [personaId], references: [id])
+  personas Persona[] @relation("AgentPersonas")
+  topics   Topic[]
+  posts    Post[]
+  tickLogs TickLog[]
+}
+
+// ============================================================
+// Persona — versioned agent identity / voice config
+// ============================================================
+model Persona {
+  id         String   @id @default(cuid())
+  agentId    String
+  version    Int
+  name       String
+  domain     String
+  voiceRules Json     // { bannedPhrases: string[], toneDescription: string, styleNotes: string }
+  pillars    Json     // string[]  — topics the agent covers
+  antiTopics Json     // string[]  — topics the agent refuses
+  createdAt  DateTime @default(now())
+
+  agentRef     Agent   @relation("AgentPersonas", fields: [agentId], references: [id])
+  agentCurrent Agent[] @relation("CurrentPersona")
+}
+
+// ============================================================
+// Topic — a discovered item from RSS/live sources
+// ============================================================
+model Topic {
+  id           String   @id @default(cuid())
+  agentId      String
+  title        String
+  url          String
+  discoveredAt DateTime @default(now())
+  status       String   // "candidate" | "chosen" | "rejected"
+  rejectReason String?  // populated when status = "rejected"
+
+  agent Agent  @relation(fields: [agentId], references: [id])
+  posts Post[]
+}
+
+// ============================================================
+// Post — a published agent-authored post
+// ============================================================
+model Post {
+  id        String   @id @default(cuid())
+  agentId   String
+  topicId   String?
+  text      String
+  rationale String
+  sources   Json     // PostSource[]  — array of { url, fetchedAt, factsExtracted? }
+  createdAt DateTime @default(now())
+
+  agent   Agent    @relation(fields: [agentId], references: [id])
+  topic   Topic?   @relation(fields: [topicId], references: [id])
+  srcs    Source[]
+}
+
+// ============================================================
+// Source — individual source record bound to a post
+// ============================================================
+model Source {
+  id             String   @id @default(cuid())
+  postId         String
+  url            String
+  fetchedAt      DateTime @default(now())
+  factsExtracted Json?    // raw extracted facts bound to this URL
+
+  post Post @relation(fields: [postId], references: [id])
+}
+
+// ============================================================
+// TickLog — one record per orchestrator run, for auditability
+// ============================================================
+model TickLog {
+  id      String   @id @default(cuid())
+  agentId String
+  ranAt   DateTime @default(now())
+  outcome String   // "published" | "held" | "killed"
+  detail  String   // human-readable debug summary
+
+  agent Agent @relation(fields: [agentId], references: [id])
+}
