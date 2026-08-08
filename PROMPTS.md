@@ -1782,3 +1782,252 @@ Stop after Phase 3. Do not implement the dashboard or any Phase 4 functionality.
 
 **Commit:**
 `feat: implement autonomous execution engine`
+
+# Prompt 9 — Phase 4 Final UI Verification & Freeze
+
+## Objective
+
+Perform a final verification and freeze of Phase 4 — Stitch UI Implementation.
+
+Phase 4 is already implemented. The purpose of this prompt is to AUDIT and VERIFY the existing implementation, not to redesign or extend it.
+
+The backend architecture and API contracts are FROZEN.
+
+---
+
+## IMPORTANT — DO NOT EXPAND SCOPE
+
+Do NOT implement Phase 5.
+
+Do NOT modify the autonomous execution engine.
+
+Do NOT modify the Scout, Curator, Researcher, Writer, Critic, Publisher, or Orchestrator logic.
+
+Do NOT modify:
+
+- `src/agent/orchestrator.ts`
+- `src/agent/memory.ts`
+- `src/agent/agentStore.ts`
+- `src/agent/scout/*`
+- `src/agent/curator/*`
+- `src/agent/researcher/*`
+- `src/agent/publishing/*`
+- `src/app/api/agent/init/route.ts`
+- `src/app/api/agent/feed/route.ts`
+- `src/app/api/agent/tick/route.ts`
+- Prisma schema
+- Database schema
+- LLM provider implementation
+- Cron/scheduler architecture
+
+Do NOT add new backend APIs.
+
+Do NOT add authentication.
+
+Do NOT add deployment configuration.
+
+Do NOT add real social-media integrations.
+
+Do NOT add analytics that require new backend functionality.
+
+Do NOT replace real database data with fabricated demo data.
+
+---
+
+# Phase 4 Scope
+
+Phase 4 is UI only.
+
+The implemented dashboard screens are:
+
+1. `/dashboard`
+2. `/dashboard/content`
+3. `/dashboard/topics`
+4. `/dashboard/activity`
+5. `/dashboard/persona`
+6. `/dashboard/post/[id]`
+7. `/dashboard/settings`
+
+The UI must use the existing backend/database as its source of truth.
+
+---
+
+# Stitch Design Requirements
+
+Verify that the implementation follows the approved Stitch design direction:
+
+- Dark AI-native SaaS aesthetic
+- Deep navy background
+- Indigo primary accent
+- Cyan secondary/status accent
+- Clear card hierarchy
+- Persistent left sidebar
+- Desktop-first layout
+- Responsive behavior for smaller screens
+- Geist-style typography
+- JetBrains Mono-style technical labels
+- Consistent badges and status indicators
+- Command-center style dashboard
+- Clear autonomous pipeline visualization
+
+Do not redesign the visual system unless there is an obvious implementation bug.
+
+---
+
+# Data Integrity Requirements
+
+Verify that the UI does not fabricate backend functionality.
+
+### Dashboard
+
+Use real data from the existing database.
+
+Display:
+
+- Agent status
+- Published count
+- Topic information
+- Tick/execution information
+- Last execution state
+
+### Content
+
+Use real `Post` records.
+
+Display:
+
+- Generated text
+- Rationale
+- Sources
+- Creation time
+- Agent information
+
+### Topics
+
+Use real `Topic` records.
+
+Display:
+
+- Title
+- Description
+- Source URL
+- Discovery time
+- Status
+
+### Activity
+
+Use real `TickLog` records.
+
+Display:
+
+- Outcome
+- Execution details
+- Timestamp
+- Duration where available
+
+### Persona
+
+Use the existing `Persona` record.
+
+Display:
+
+- Name
+- Domain
+- Version
+- Voice rules
+- Content pillars
+- Anti-topics
+- Banned phrases
+
+### Post Details
+
+Use the real `Post` and associated `Source` records.
+
+Display:
+
+- Generated content
+- Rationale
+- Selected topic
+- Extracted facts
+- Reference URLs
+
+### Settings
+
+Display configuration information without exposing secrets.
+
+NEVER display:
+
+- `GROQ_API_KEY`
+- `DATABASE_URL`
+- Any other secret or environment variable value
+
+The LLM provider may be displayed as:
+
+`Groq (Online)`
+
+if that reflects the current backend environment.
+
+---
+
+# Read-Only Controls
+
+Where the backend does not provide mutation functionality, controls must remain read-only or disabled.
+
+Examples:
+
+- Persona editing
+- Topic manual rejection
+- Topic manual creation
+- LLM provider switching
+- Schedule modification
+- Agent configuration mutation
+
+Do NOT create fake frontend functionality for these operations.
+
+---
+
+# Trigger Run
+
+Verify that the existing `Trigger Run` button uses the existing:
+
+`POST /api/agent/tick`
+
+endpoint.
+
+It may:
+
+- show loading state
+- show success state
+- show error state
+- refresh/revalidate displayed data
+
+It must NOT introduce a new backend endpoint.
+
+---
+
+# Navigation
+
+Verify all dashboard navigation links work:
+
+- Dashboard
+- Content
+- Topics
+- Activity
+- Persona
+- Settings
+
+Verify:
+
+- Post cards can navigate to `/dashboard/post/[id]`
+- Back navigation works where applicable
+- No broken links exist
+- No dead navigation items exist
+
+---
+
+# Build Verification
+
+Run:
+
+```bash
+npm run build
