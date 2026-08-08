@@ -23,6 +23,10 @@ import * as publisher from "./pipeline/publisher";
 export interface TickResult {
   outcome: TickOutcome;
   detail: string;
+  /** Populated only when outcome === "published". */
+  postId?: string;
+  /** Wall-clock duration of the full tick in milliseconds. */
+  durationMs: number;
 }
 
 /**
@@ -49,6 +53,7 @@ export async function runTick(agentId: string): Promise<TickResult> {
 
   let outcome: TickOutcome = "held";
   let detail = "";
+  let postId: string | undefined;
 
   try {
     // ── 1. Load persona ──────────────────────────────────────
@@ -119,6 +124,7 @@ export async function runTick(agentId: string): Promise<TickResult> {
           );
 
           outcome = "published";
+          postId = post.id;
           detail = `Published post ${post.id} on topic: "${chosenTopic.title}". Critic score: ${criticResult.score}.`;
           logger.info("orchestrator.runTick: published", {
             agentId,
@@ -155,6 +161,7 @@ export async function runTick(agentId: string): Promise<TickResult> {
     });
   }
 
-  logger.info("orchestrator.runTick finished", { agentId, outcome, detail });
-  return { outcome, detail };
+  const durationMs = Date.now() - startedAt.getTime();
+  logger.info("orchestrator.runTick finished", { agentId, outcome, detail, durationMs });
+  return { outcome, detail, postId, durationMs };
 }

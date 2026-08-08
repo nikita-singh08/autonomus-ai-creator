@@ -9,9 +9,10 @@
 // TODO (Milestone 3): orchestrator.runTick will invoke the full pipeline once stages are built.
 
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 import { runTick } from "@/agent/orchestrator";
 import { logger } from "@/lib/logger";
-import type { TickRequest, TickResponse } from "@/types/agent";
+import type { TickRequest } from "@/types/agent";
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,17 +28,33 @@ export async function POST(req: NextRequest) {
 
     logger.info("POST /api/agent/tick received", { agentId });
 
+    // Validate the agent exists before firing the cycle.
+    const agent = await prisma.agent.findUnique({
+      where: { id: agentId },
+      select: { id: true },
+    });
+    if (!agent) {
+      return NextResponse.json(
+        { success: false, error: `Agent not found: ${agentId}` },
+        { status: 404 }
+      );
+    }
+
     const result = await runTick(agentId);
 
-    const response: TickResponse = {
-      outcome: result.outcome,
-      detail: result.detail,
-    };
-
-    return NextResponse.json(response, { status: 200 });
+    return NextResponse.json(
+      {
+        success: true,
+        outcome: result.outcome,
+        detail: result.detail,
+        durationMs: result.durationMs,
+        ...(result.postId ? { postId: result.postId } : {}),
+      },
+      { status: 200 }
+    );
 
   } catch (error) {
     logger.error("POST /api/agent/tick failed", { error: String(error) });
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 });
   }
 }

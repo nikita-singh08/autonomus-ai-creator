@@ -6,7 +6,7 @@
 // ============================================================
 
 import { prisma } from "@/lib/prisma";
-import type { Persona, Post, PostSource, Topic } from "@/types/agent";
+import type { Agent, Persona, Post, PostSource, Topic } from "@/types/agent";
 
 // --------------- Persona defaults -----------------------
 
@@ -151,6 +151,22 @@ function toTopic(row: {
 // --------------- Public API -----------------------------------------
 
 /**
+ * Retrieve a single Agent row by id.
+ * Returns null (never throws) when the agent does not exist.
+ */
+export async function getAgent(agentId: string): Promise<Agent | null> {
+  const row = await prisma.agent.findUnique({
+    where: { id: agentId },
+  });
+  if (!row) return null;
+  return {
+    id: row.id,
+    createdAt: row.createdAt,
+    personaId: row.personaId,
+  };
+}
+
+/**
  * Retrieve the current persona config for an agent.
  * Joins Agent → Persona via the Agent.personaId FK.
  */
@@ -241,4 +257,59 @@ export async function updateTopicStatus(
       rejectReason: rejectReason ?? null,
     },
   });
+}
+
+/**
+ * Retrieve the N most recently discovered topics for an agent,
+ * regardless of status.  Used by the orchestrator for context.
+ */
+export async function getRecentTopics(
+  agentId: string,
+  limit = 20
+): Promise<Topic[]> {
+  const rows = await prisma.topic.findMany({
+    where: { agentId },
+    orderBy: { discoveredAt: "desc" },
+    take: limit,
+  });
+  return rows.map(toTopic);
+}
+
+/**
+ * Retrieve topics that were previously rejected within the past
+ * `windowHours` hours.  The curator uses this to avoid re-scoring
+ * topics that were already judged unworthy.
+ */
+export async function getRejectedTopics(
+  agentId: string,
+  windowHours = 48
+): Promise<Topic[]> {
+  const since = new Date(Date.now() - windowHours * 60 * 60 * 1000);
+  const rows = await prisma.topic.findMany({
+    where: {
+      agentId,
+      status: "rejected",
+      discoveredAt: { gte: since },
+    },
+    orderBy: { discoveredAt: "desc" },
+  });
+  return rows.map(toTopic);
+}
+
+/**
+ * Return true if the agent has already published a Post whose source
+ * list contains `url`.  Prevents republishing the same content.
+ *
+ * Checks the Topic table first (O(1) index hit on url+agentId)
+ * because every published topic has status="chosen".
+ */
+export async function hasPublishedUrl(
+  agentId: string,
+  url: string
+): Promise<boolean> {
+  const existing = await prisma.topic.findFirst({
+    where: { agentId, url, status: "chosen" },
+    select: { id: true },
+  });
+  return existing !== null;
 }

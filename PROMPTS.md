@@ -1558,3 +1558,227 @@ feat: implement autonomous publishing pipeline
 ```
 
 ---
+
+## Prompt 7
+
+**Tool:** Antigravity
+
+**Purpose:**
+Replace the Anthropic LLM provider with Groq for Phase 2 while preserving the existing publishing architecture.
+
+**Prompt:**
+PHASE 2 LLM PROVIDER CHANGE — GROQ
+
+The Phase 2 publishing pipeline is already implemented and tested up to
+the LLM authentication step.
+
+I have a Groq API key and want to use Groq instead of Anthropic for
+development and evaluation.
+
+IMPORTANT:
+Do NOT redesign or rewrite Phase 2.
+
+Do NOT modify:
+- Writer
+- Critic
+- Publisher
+- Researcher
+- Curator
+- Scout
+- Prisma schema
+- Database
+- API routes
+- Orchestrator
+- UI
+
+ONLY change the LLM provider implementation.
+
+CURRENT FILE:
+
+src/lib/llm.ts
+
+CURRENT IMPLEMENTATION:
+It uses @anthropic-ai/sdk and ANTHROPIC_API_KEY.
+
+TASK:
+
+1. Replace the Anthropic implementation with Groq.
+
+2. Preserve the existing public API exactly:
+
+- LLMMessage
+- LLMResponse
+- callLLM()
+
+All existing callers must continue to work without modification.
+
+3. Use:
+
+GROQ_API_KEY
+
+from the environment.
+
+4. Choose a currently supported Groq model suitable for fast,
+high-quality text generation.
+
+5. Preserve:
+- system message handling
+- user/assistant message handling
+- maxTokens option
+- temperature option
+- retry handling
+- error handling
+- LLMResponse format
+
+6. If a Groq SDK/package is required:
+- install only the necessary package
+- update package.json and package-lock.json
+- do not install unnecessary dependencies
+
+7. Remove the Anthropic dependency ONLY if it is no longer used anywhere
+in the project.
+
+Before removing it, search the entire repository for imports/usages of
+@anthropic-ai/sdk and Anthropic.
+
+8. Update environment configuration/documentation from:
+
+ANTHROPIC_API_KEY
+
+to:
+
+GROQ_API_KEY
+
+Do NOT expose or hardcode my actual API key.
+
+9. Do not put the API key into Git, source files, PROMPTS.md, README.md,
+or any committed file.
+
+10. Verify that TypeScript compiles successfully.
+
+11. Verify the existing publishing pipeline using:
+
+GET /api/debug/publish
+
+Do not create a new publishing architecture.
+
+EXPECTED RESULT:
+
+Writer
+  ↓
+callLLM()
+  ↓
+Groq
+  ↓
+LLMResponse
+  ↓
+Critic
+  ↓
+Publisher
+
+The rest of Phase 2 must remain unchanged.
+
+STOP after completing this provider migration and verification.
+Do not implement Phase 3 or Phase 4.
+
+
+**Result:**
+- Replaced Anthropic LLM integration with Groq
+- Preserved the existing `callLLM()` interface
+- Updated environment configuration
+- Verified the publishing pipeline
+- Phase 2 build completed successfully
+
+**Verification:**
+- `/api/debug/publish` → `published: true`
+- `/api/agent/feed` → posts returned
+- `npm run build` → successful
+
+**Commit:**
+`feat: implement autonomous publishing pipeline`
+
+## Prompt 8
+
+**Tool:** Antigravity
+
+**Purpose:**  
+Implement Phase 3 — Autonomous Execution Engine while preserving the already completed Phase 1 and Phase 2 backend.
+
+**Prompt:**
+
+The Phase 3 implementation plan looks correct.
+
+Proceed with ONLY the proposed changes:
+
+1. Add the four missing functions to `src/agent/memory.ts`:
+   - `getAgent(agentId)`
+   - `getRecentTopics(agentId, limit)`
+   - `getRejectedTopics(agentId, windowHours)`
+   - `hasPublishedUrl(agentId, url)`
+
+2. Update `scripts/cron-tick.ts` to:
+   - load all agents from the database
+   - run `runTick()` for each agent
+   - handle failures independently
+   - continue processing other agents
+   - exit cleanly when no agents exist
+
+3. Create:
+   `src/app/api/debug/tick/route.ts`
+
+   The endpoint should:
+   - accept `agentId` from the query string
+   - use the first agent when no agentId is provided
+   - delegate to `runTick()`
+   - return success, outcome, detail, durationMs and post when available
+   - clearly indicate that it is development-only
+
+4. Update `/api/agent/tick` so its response includes:
+   - `success`
+   - `outcome`
+   - `postId` when published
+   - `detail`
+   - `durationMs`
+
+IMPORTANT:
+
+- Do NOT rewrite `src/agent/orchestrator.ts` unnecessarily.
+- Do NOT modify the Prisma schema.
+- Do NOT modify the existing Phase 1 or Phase 2 pipeline.
+- Do NOT implement the dashboard or UI.
+- Do NOT start Phase 4.
+- Preserve all existing API contracts.
+- Reuse the existing Scout, Curator, Researcher, Writer, Critic and Publisher implementations.
+- Keep the system safe against repeated execution and duplicate publishing.
+- Use the existing logger and error-handling patterns.
+- Do not expose secrets or API keys.
+
+After implementation, verify:
+
+1. TypeScript/build passes.
+2. `/api/debug/tick?agentId=<agentId>` executes successfully.
+3. `POST /api/agent/tick` executes successfully.
+4. TickLog records are created correctly.
+5. Published cycles create Posts.
+6. Held/killed cycles do not create Posts.
+7. Repeated ticks do not blindly republish the same topic or URL.
+
+Stop after Phase 3. Do not implement the dashboard or any Phase 4 functionality.
+
+**Result:**
+- Completed the missing memory functions.
+- Added multi-agent scheduler support.
+- Added the development tick endpoint.
+- Enhanced the agent tick response.
+- Preserved the existing autonomous publishing pipeline.
+- Added/maintained autonomous execution logging and error handling.
+
+**Verification:**
+- `/api/debug/tick` tested successfully.
+- `/api/agent/tick` tested successfully.
+- TickLog records verified in Prisma Studio.
+- `held` outcome verified when Scout had no eligible candidates.
+- Production build completed successfully.
+
+**Commit:**
+`feat: implement autonomous execution engine`
