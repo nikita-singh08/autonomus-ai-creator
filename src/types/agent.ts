@@ -82,6 +82,8 @@ export interface CandidateTopic {
   url: string;
   snippet?: string;
   source?: string;
+  /** ISO publish date of the original article (used for timeliness scoring) */
+  publishedAt?: Date;
 }
 
 /** Returned by curator.judge() */

@@ -3,58 +3,171 @@
 // ============================================================
 // Queries past posts and topics for deduplication and context injection.
 // This module contains NO decision logic — it only reads/writes data.
-//
-// TODO (Milestone 3 – Orchestrator): Implement all functions below.
+// ============================================================
 
 import { prisma } from "@/lib/prisma";
-import type { Persona, Post, Topic } from "@/types/agent";
+import type { Persona, Post, PostSource, Topic } from "@/types/agent";
+
+// --------------- Helpers ---------------------------------
+
+/** Map a raw Prisma Persona row → domain Persona type. */
+function toPersona(row: {
+  id: string;
+  agentId: string;
+  version: number;
+  name: string;
+  domain: string;
+  voiceRules: unknown;
+  pillars: unknown;
+  antiTopics: unknown;
+  createdAt: Date;
+}): Persona {
+  return {
+    id: row.id,
+    agentId: row.agentId,
+    version: row.version,
+    name: row.name,
+    domain: row.domain,
+    voiceRules: row.voiceRules as Persona["voiceRules"],
+    pillars: row.pillars as string[],
+    antiTopics: row.antiTopics as string[],
+    createdAt: row.createdAt,
+  };
+}
+
+/** Map a raw Prisma Post row → domain Post type. */
+function toPost(row: {
+  id: string;
+  agentId: string;
+  topicId: string | null;
+  text: string;
+  rationale: string;
+  sources: unknown;
+  createdAt: Date;
+}): Post {
+  return {
+    id: row.id,
+    agentId: row.agentId,
+    topicId: row.topicId ?? undefined,
+    text: row.text,
+    rationale: row.rationale,
+    sources: row.sources as PostSource[],
+    createdAt: row.createdAt,
+  };
+}
+
+/** Map a raw Prisma Topic row → domain Topic type. */
+function toTopic(row: {
+  id: string;
+  agentId: string;
+  title: string;
+  url: string;
+  discoveredAt: Date;
+  status: string;
+  rejectReason: string | null;
+}): Topic {
+  return {
+    id: row.id,
+    agentId: row.agentId,
+    title: row.title,
+    url: row.url,
+    discoveredAt: row.discoveredAt,
+    status: row.status as Topic["status"],
+    rejectReason: row.rejectReason ?? undefined,
+  };
+}
+
+// --------------- Public API -----------------------------------------
 
 /**
  * Retrieve the current persona config for an agent.
- *
- * TODO (Milestone 3): implement Prisma lookup via Agent → Persona join.
+ * Joins Agent → Persona via the Agent.personaId FK.
  */
 export async function getPersona(agentId: string): Promise<Persona> {
-  void agentId;
-  throw new Error("memory.getPersona not yet implemented");
+  const agent = await prisma.agent.findUnique({
+    where: { id: agentId },
+    include: { persona: true },
+  });
+  if (!agent) throw new Error(`memory.getPersona: Agent not found: ${agentId}`);
+  return toPersona(agent.persona);
 }
 
 /**
  * Retrieve the N most recent published posts for an agent.
  * Used for dedupe context passed to curator and critic.
- *
- * TODO (Milestone 3): implement Prisma findMany with orderBy + take.
  */
-export async function getRecentPosts(agentId: string, limit = 20): Promise<Post[]> {
-  void agentId;
-  void limit;
-  throw new Error("memory.getRecentPosts not yet implemented");
+export async function getRecentPosts(
+  agentId: string,
+  limit = 20
+): Promise<Post[]> {
+  const rows = await prisma.post.findMany({
+    where: { agentId },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+  return rows.map(toPost);
 }
 
 /**
- * Retrieve recently discovered topic URLs so the scout can skip duplicates.
- *
- * TODO (Milestone 3): implement Prisma findMany filtered by agentId + discoveredAt window.
+ * Retrieve topic URLs discovered within the past `windowHours` hours.
+ * The scout uses this list to skip URLs it has already seen.
  */
 export async function getRecentTopicUrls(
   agentId: string,
   windowHours = 48
 ): Promise<string[]> {
-  void agentId;
-  void windowHours;
-  throw new Error("memory.getRecentTopicUrls not yet implemented");
+  const since = new Date(Date.now() - windowHours * 60 * 60 * 1000);
+  const rows = await prisma.topic.findMany({
+    where: {
+      agentId,
+      discoveredAt: { gte: since },
+    },
+    select: { url: true },
+  });
+  return rows.map((r) => r.url);
 }
 
 /**
- * Record a discovered topic to the DB.
- *
- * TODO (Milestone 3): implement Prisma create for Topic model.
+ * Persist a newly discovered topic to the DB.
+ * Silently returns null if the URL already exists for this agent
+ * (upsert-style safety net on top of the scout's in-memory dedupe).
  */
 export async function saveTopic(
   agentId: string,
   topic: Omit<Topic, "id" | "agentId" | "discoveredAt">
 ): Promise<Topic> {
-  void agentId;
-  void topic;
-  throw new Error("memory.saveTopic not yet implemented");
+  // Guard: never insert duplicate URLs for the same agent.
+  const existing = await prisma.topic.findFirst({
+    where: { agentId, url: topic.url },
+  });
+  if (existing) return toTopic(existing);
+
+  const row = await prisma.topic.create({
+    data: {
+      agentId,
+      title: topic.title,
+      url: topic.url,
+      status: topic.status,
+      rejectReason: topic.rejectReason ?? null,
+    },
+  });
+  return toTopic(row);
+}
+
+/**
+ * Update an existing topic's status and optional reject reason.
+ * Used by the curator to transition candidate → chosen / rejected.
+ */
+export async function updateTopicStatus(
+  topicId: string,
+  status: Topic["status"],
+  rejectReason?: string
+): Promise<void> {
+  await prisma.topic.update({
+    where: { id: topicId },
+    data: {
+      status,
+      rejectReason: rejectReason ?? null,
+    },
+  });
 }
