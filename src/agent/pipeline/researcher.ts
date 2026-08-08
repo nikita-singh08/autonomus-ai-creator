@@ -201,8 +201,10 @@ async function fetchArticleHtml(url: string): Promise<string | null> {
  *   4. Return top facts bound to topic.url
  *   5. If fetch fails, construct a minimal result from snippet/title
  *
+ * GUARANTEE: always returns non-undefined arrays for facts, sources, keyPoints.
+ *
  * @param topic - The curator-selected topic to research
- * @returns     { facts[], sources[], summary } — facts bound to source URLs
+ * @returns     { facts[], sources[], summary, keyPoints[] } — facts bound to source URLs
  */
 export async function gather(
   topic: CandidateTopic & { publishedAt?: Date; source?: string }
@@ -214,6 +216,9 @@ export async function gather(
   });
 
   const fetchedAt = new Date();
+
+  // Always initialise as empty array — every code path below will either
+  // populate it or fall back to the title-based minimum.
   let facts: BoundFact[] = [];
   let fetchSucceeded = false;
 
@@ -224,8 +229,10 @@ export async function gather(
     const bodyText = extractMainBody(html).slice(0, MAX_BODY_CHARS);
 
     if (bodyText.length > 100) {
-      facts = extractFacts(bodyText, topic.url);
-      fetchSucceeded = true;
+      const extracted = extractFacts(bodyText, topic.url);
+      // extractFacts always returns BoundFact[] (may be empty), never undefined.
+      facts = Array.isArray(extracted) ? extracted : [];
+      fetchSucceeded = facts.length > 0;
     } else {
       logger.warn("researcher: body text too short after extraction", {
         url: topic.url,
@@ -234,7 +241,7 @@ export async function gather(
     }
   }
 
-  // ── Fallback: use snippet + title if fetch failed ─────────
+  // ── Fallback: use snippet + title if fetch produced no facts ───
   if (!fetchSucceeded || facts.length === 0) {
     logger.warn("researcher: falling back to snippet/title for facts", {
       url: topic.url,
@@ -245,37 +252,44 @@ export async function gather(
       .join(". ");
 
     if (fallbackText.length > 10) {
-      facts = extractFacts(fallbackText, topic.url);
+      const extracted = extractFacts(fallbackText, topic.url);
+      facts = Array.isArray(extracted) ? extracted : [];
     }
 
-    // Absolute minimum: at least one fact from the title.
+    // Absolute minimum: at least one fact from the title, always.
     if (facts.length === 0) {
       facts = [{ fact: topic.title, sourceUrl: topic.url }];
     }
   }
 
-  // ── Build PostSource record ────────────────────────────────
+  // ── Build PostSource record ─────────────────────────────────
+  // factsExtracted is always a string[] (never undefined) from this point.
+  const extractedStrings: string[] = facts.map((f) => f.fact);
+
   const postSource: PostSource = {
     url: topic.url,
     fetchedAt,
-    factsExtracted: facts.map((f) => f.fact),
+    factsExtracted: extractedStrings,
   };
 
-  // ── Summary + key points ──────────────────────────────────
+  // ── Summary + key points ─────────────────────────────────────
   const summary = generateSummary(facts);
-  const keyPoints = facts.slice(0, 5).map((f) => f.fact);
+  // keyPoints is always a string[] — slice is safe on an array.
+  const keyPoints: string[] = facts.slice(0, 5).map((f) => f.fact);
 
   logger.info("researcher: Research Finished", {
     url: topic.url,
     factCount: facts.length,
+    keyPointCount: keyPoints.length,
     fetchSucceeded,
-    summary: summary.slice(0, 120) + "…",
+    summary: summary.slice(0, 120) + "\u2026",
   });
 
+  // Return shape: all array fields are guaranteed non-undefined.
   return {
-    facts,
-    sources: [postSource],
-    summary,
-    keyPoints,
+    facts,          // BoundFact[]   — always at least 1 element
+    sources: [postSource], // PostSource[] — always exactly 1 element
+    summary,        // string        — always a non-empty string
+    keyPoints,      // string[]      — 0–5 elements
   };
 }

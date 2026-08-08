@@ -6,22 +6,19 @@
 // Writes a TickLog row for every run regardless of outcome.
 //
 // Does NOT implement any stage's logic — it only sequences calls.
-//
-// TODO (Milestone 2): Wire up no-op tick that just writes TickLog.
-// TODO (Milestone 3): Uncomment each stage call as they are implemented.
+// ============================================================
 
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import type { TickOutcome } from "@/types/agent";
 
-// TODO (Milestone 3): Uncomment imports as each stage is implemented.
-// import * as memory from "./memory";
-// import * as scout from "./pipeline/scout";
-// import * as curator from "./pipeline/curator";
-// import * as researcher from "./pipeline/researcher";
-// import * as writer from "./pipeline/writer";
-// import * as critic from "./pipeline/critic";
-// import * as publisher from "./pipeline/publisher";
+import * as memory from "./memory";
+import * as scout from "./pipeline/scout";
+import * as curator from "./pipeline/curator";
+import * as researcher from "./pipeline/researcher";
+import * as writer from "./pipeline/writer";
+import * as critic from "./pipeline/critic";
+import * as publisher from "./pipeline/publisher";
 
 export interface TickResult {
   outcome: TickOutcome;
@@ -31,39 +28,132 @@ export interface TickResult {
 /**
  * Run one full agent pipeline cycle for the given agentId.
  *
- * TODO (Milestone 2): Replace the stub body with a no-op that logs a TickLog row.
- * TODO (Milestone 3): Uncomment each stage sequentially as they are built.
- *
- * Full flow (for reference, do not implement yet):
+ * Flow:
  *   1. memory.getPersona(agentId)
  *   2. memory.getRecentPosts(agentId)
- *   3. scout.discover(persona, seenUrls)
- *   4. curator.judge(candidates, recentPosts, persona)
+ *   3. scout.discover(persona, agentId)
+ *   4. curator.judge(candidates, recentPosts, persona, agentId)
  *      → if null: log "held", return
  *   5. researcher.gather(chosenTopic)
- *   6. writer.draft(research, persona)
+ *   6. writer.draft(research, persona, chosenTopic)
  *   7. critic.evaluate(draft, recentPosts, sources)
- *      → if fail: log "killed", return (or retry once)
+ *      → if fail: log "killed", return
  *   8. publisher.commit(agentId, draft, sources, topicId)
  *      → log "published"
+ *
+ * Supports manual execution — no background scheduling here.
  */
 export async function runTick(agentId: string): Promise<TickResult> {
   const startedAt = new Date();
   logger.info("orchestrator.runTick started", { agentId });
 
-  // TODO (Milestone 2): Replace with real pipeline invocations.
-  const outcome: TickOutcome = "held";
-  const detail = "Orchestrator not yet implemented — no-op placeholder.";
+  let outcome: TickOutcome = "held";
+  let detail = "";
 
-  // Always write a TickLog row so the scheduler is visibly alive.
-  await prisma.tickLog.create({
-    data: {
+  try {
+    // ── 1. Load persona ──────────────────────────────────────
+    const persona = await memory.getPersona(agentId);
+
+    // ── 2. Load recent posts for context / dedupe ────────────
+    const recentPosts = await memory.getRecentPosts(agentId, 20);
+
+    // ── 3. Scout: discover candidate topics ──────────────────
+    const candidates = await scout.discover(persona, agentId);
+
+    if (candidates.length === 0) {
+      outcome = "held";
+      detail = "Scout returned no candidates — no eligible topics found this cycle.";
+      logger.info("orchestrator.runTick: held — no candidates", { agentId });
+    } else {
+      // ── 4. Curator: score and select best topic ─────────────
+      const curatorResult = await curator.judge(
+        candidates,
+        recentPosts,
+        persona,
+        agentId
+      );
+
+      if (!curatorResult.chosenTopic) {
+        outcome = "held";
+        detail = `Curator held: ${curatorResult.reasoning}`;
+        logger.info("orchestrator.runTick: held — curator skipped", {
+          agentId,
+          reasoning: curatorResult.reasoning,
+        });
+      } else {
+        const chosenTopic = curatorResult.chosenTopic;
+
+        // Find the DB topic ID for the chosen topic (for publisher).
+        const dbTopic = await prisma.topic.findFirst({
+          where: { agentId, url: chosenTopic.url },
+          select: { id: true },
+        });
+
+        // ── 5. Researcher: gather facts ──────────────────────
+        const research = await researcher.gather(chosenTopic);
+
+        // ── 6. Writer: generate post text ───────────────────
+        const draftResult = await writer.draft(research, persona, chosenTopic);
+
+        // ── 7. Critic: run integrity gates ──────────────────
+        const criticResult = await critic.evaluate(
+          draftResult,
+          recentPosts,
+          research.sources
+        );
+
+        if (!criticResult.pass) {
+          outcome = "killed";
+          detail = `Critic rejected draft: ${criticResult.reason}`;
+          logger.info("orchestrator.runTick: killed — critic rejected", {
+            agentId,
+            reason: criticResult.reason,
+          });
+        } else {
+          // ── 8. Publisher: persist post ───────────────────
+          const post = await publisher.commit(
+            agentId,
+            draftResult,
+            research.sources,
+            dbTopic?.id
+          );
+
+          outcome = "published";
+          detail = `Published post ${post.id} on topic: "${chosenTopic.title}". Critic score: ${criticResult.score}.`;
+          logger.info("orchestrator.runTick: published", {
+            agentId,
+            postId: post.id,
+            topicTitle: chosenTopic.title,
+          });
+        }
+      }
+    }
+  } catch (err) {
+    // Unexpected error — log it and mark as killed so TickLog reflects the failure.
+    outcome = "killed";
+    detail = `Unhandled error: ${err instanceof Error ? err.message : String(err)}`;
+    logger.error("orchestrator.runTick: unhandled error", {
       agentId,
-      ranAt: startedAt,
-      outcome,
-      detail,
-    },
-  });
+      error: detail,
+    });
+  }
+
+  // Always write a TickLog row so every run is auditable.
+  try {
+    await prisma.tickLog.create({
+      data: {
+        agentId,
+        ranAt: startedAt,
+        outcome,
+        detail,
+      },
+    });
+  } catch (err) {
+    logger.error("orchestrator.runTick: failed to write TickLog", {
+      agentId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 
   logger.info("orchestrator.runTick finished", { agentId, outcome, detail });
   return { outcome, detail };

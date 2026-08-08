@@ -8,9 +8,80 @@
 import { prisma } from "@/lib/prisma";
 import type { Persona, Post, PostSource, Topic } from "@/types/agent";
 
+// --------------- Persona defaults -----------------------
+
+/**
+ * The minimum valid VoiceRules object.
+ * Applied as a fallback when a DB row's JSON is missing fields.
+ * Matches the schema expected by writer.ts validatePersona().
+ */
+const DEFAULT_VOICE_RULES = {
+  bannedPhrases: [] as string[],
+  toneDescription: "Professional AI and technology analyst.",
+  styleNotes: "Clear, factual, insightful, concise.",
+};
+
+/** Default pillars for the AI/tech domain. */
+const DEFAULT_PILLARS: string[] = [
+  "artificial intelligence",
+  "software engineering",
+  "developer tools",
+  "open source",
+  "systems design",
+];
+
+/** Default anti-topics. */
+const DEFAULT_ANTI_TOPICS: string[] = [
+  "celebrity gossip",
+  "sports",
+  "politics",
+  "cryptocurrency speculation",
+  "NFTs",
+];
+
 // --------------- Helpers ---------------------------------
 
-/** Map a raw Prisma Persona row → domain Persona type. */
+/**
+ * Safely coerce an unknown DB value to a string array.
+ * Returns `fallback` if the value is not a real string[].
+ */
+function toStringArray(raw: unknown, fallback: string[]): string[] {
+  if (Array.isArray(raw) && raw.every((v) => typeof v === "string")) {
+    return raw as string[];
+  }
+  return fallback;
+}
+
+/**
+ * Safely coerce the `voiceRules` JSON column to a VoiceRules object.
+ * Any missing sub-field is filled from DEFAULT_VOICE_RULES so downstream
+ * code never encounters undefined on bannedPhrases / toneDescription / styleNotes.
+ */
+function toVoiceRules(raw: unknown): { bannedPhrases: string[]; toneDescription: string; styleNotes: string } {
+  const base = DEFAULT_VOICE_RULES;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { ...base };
+
+  const obj = raw as Record<string, unknown>;
+  return {
+    bannedPhrases: toStringArray(obj.bannedPhrases, base.bannedPhrases),
+    toneDescription:
+      typeof obj.toneDescription === "string" && obj.toneDescription.trim()
+        ? obj.toneDescription
+        : base.toneDescription,
+    styleNotes:
+      typeof obj.styleNotes === "string" && obj.styleNotes.trim()
+        ? obj.styleNotes
+        : base.styleNotes,
+  };
+}
+
+/** Map a raw Prisma Persona row → domain Persona type.
+ *
+ * All JSON columns (voiceRules, pillars, antiTopics) are coerced
+ * with safe defaults so the resulting Persona always satisfies the
+ * VoiceRules contract expected by writer.ts, even for rows that were
+ * written by an older version of the codebase.
+ */
 function toPersona(row: {
   id: string;
   agentId: string;
@@ -28,9 +99,9 @@ function toPersona(row: {
     version: row.version,
     name: row.name,
     domain: row.domain,
-    voiceRules: row.voiceRules as Persona["voiceRules"],
-    pillars: row.pillars as string[],
-    antiTopics: row.antiTopics as string[],
+    voiceRules: toVoiceRules(row.voiceRules),
+    pillars: toStringArray(row.pillars, DEFAULT_PILLARS),
+    antiTopics: toStringArray(row.antiTopics, DEFAULT_ANTI_TOPICS),
     createdAt: row.createdAt,
   };
 }

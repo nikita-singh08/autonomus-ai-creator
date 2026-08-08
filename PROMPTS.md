@@ -519,3 +519,484 @@ Stop after this milestone.
 ```text
 feat: implement feed retrieval endpoint
 ```
+
+---
+
+# Prompt 5
+
+## Tool
+
+Antigravity
+
+---
+
+## Purpose
+
+Implement the Autonomous Intelligence Layer of the Autonomous AI Creator.
+
+This phase introduces the core intelligence pipeline responsible for discovering AI and technology topics from live information sources, evaluating their relevance, and preparing structured research for future publishing.
+
+---
+
+## Prompt
+
+```text
+You are continuing an existing production-grade codebase.
+
+IMPORTANT
+
+Do NOT redesign anything.
+
+Do NOT rename folders.
+
+Do NOT change the architecture.
+
+Only implement Phase 1.
+
+=================================================
+
+PROJECT
+
+Autonomous AI Creator
+
+=================================================
+
+CURRENT STATUS
+
+Already Completed
+
+✓ Prisma
+
+✓ Agent Initialization
+
+✓ Feed Endpoint
+
+=================================================
+
+YOUR TASK
+
+Implement ONLY the Autonomous Intelligence Layer.
+
+This phase includes exactly three modules.
+
+1.
+
+Scout
+
+2.
+
+Curator
+
+3.
+
+Researcher
+
+=================================================
+
+SCOUT
+
+Implement
+
+src/agent/pipeline/scout.ts
+
+Responsibilities
+
+• Read RSS sources from src/config/sources.ts
+
+• Fetch AI and Technology news.
+
+Use multiple sources.
+
+Examples
+
+OpenAI
+
+Anthropic
+
+Google AI
+
+Microsoft AI
+
+HuggingFace
+
+GitHub Blog
+
+Arxiv AI
+
+Hacker News AI
+
+MIT Technology Review
+
+Normalize every article into
+
+Topic
+
+Store
+
+title
+
+summary
+
+url
+
+publishedAt
+
+source
+
+status = candidate
+
+Before saving
+
+check the database.
+
+Never insert duplicate URLs.
+
+Return candidate topics.
+
+=================================================
+
+CURATOR
+
+Implement
+
+src/agent/pipeline/curator.ts
+
+Responsibilities
+
+Receive candidate topics.
+
+Score every topic.
+
+Use deterministic scoring.
+
+Criteria
+
+Novelty
+
+Timeliness
+
+Persona relevance
+
+Source quality
+
+Duplicate penalty
+
+Generate
+
+score
+
+decision
+
+accepted
+
+rejected
+
+reason
+
+Reject low-quality topics.
+
+The system must be able to intentionally decide
+
+NOT TO PUBLISH.
+
+=================================================
+
+RESEARCHER
+
+Implement
+
+src/agent/pipeline/researcher.ts
+
+Responsibilities
+
+Take one accepted topic.
+
+Retrieve article content.
+
+Extract
+
+facts
+
+summary
+
+key points
+
+Bind every fact to its source URL.
+
+Return
+
+ResearchResult
+
+=================================================
+
+DATABASE
+
+Persist
+
+Candidate topics
+
+Rejected topics
+
+Accepted topic
+
+Reasoning
+
+=================================================
+
+LOGGING
+
+Log
+
+Scout Started
+
+Scout Finished
+
+Curator Started
+
+Curator Decision
+
+Research Started
+
+Research Finished
+
+=================================================
+
+ERROR HANDLING
+
+Network failures
+
+RSS failures
+
+Duplicate entries
+
+Empty feeds
+
+Graceful retries
+
+=================================================
+
+DO NOT IMPLEMENT
+
+Writer
+
+Critic
+
+Publisher
+
+Scheduler
+
+Memory
+
+Dashboard
+
+Autonomous Loop
+
+=================================================
+
+All code must compile.
+
+Follow existing architecture.
+
+Stop immediately after completing Phase 1.
+
+Do not continue to any other phase.
+
+( follow-up prompt filtering)
+
+Implement a temporary debug API endpoint.
+
+Create:
+
+src/app/api/debug/scout/route.ts
+
+Requirements:
+
+1. The endpoint should only be used for development and testing.
+
+2. On GET request:
+
+- Execute the Scout pipeline only.
+- Do not call Curator.
+- Do not call Researcher.
+- Do not call Writer.
+- Do not call Publisher.
+
+3. Return JSON:
+
+{
+  "count": number,
+  "topics": [...]
+}
+
+4. Include:
+
+title
+
+url
+
+status
+
+5. Handle errors gracefully.
+
+6. Add comments that this endpoint must be removed before final deployment.
+
+Do not modify any existing production endpoints.
+
+Implement only this endpoint.
+
+
+##Improve the Scout module.
+
+Current implementation is fetching some irrelevant articles.
+
+Add an AI/Technology relevance filter before saving topics.
+
+Reject articles that match categories such as:
+
+- Coupons
+- Deals
+- Promo codes
+- Product buying guides
+- TV shows
+- Streaming
+- Entertainment
+- General shopping
+
+Accept topics related to:
+
+- Artificial Intelligence
+- LLMs
+- Robotics
+- Machine Learning
+- Open Source
+- Programming
+- Software Engineering
+- Cloud
+- Security
+- AI Products
+- Developer Tools
+- Research
+
+Implement this as deterministic keyword filtering.
+
+Do not use an LLM.
+
+Do not modify any other module.
+```
+
+---
+
+## Expected Scope
+
+- Implement Scout module
+- Implement Curator module
+- Implement Researcher module
+- Do not implement Writer, Critic, Publisher, Scheduler, Memory, Dashboard, or Autonomous Loop
+
+---
+
+## Output Used
+
+### Scout
+
+- Reads RSS feeds from configured sources
+- Fetches live AI and technology news
+- Normalizes articles into Topic objects
+- Stores candidate topics in the database
+- Prevents duplicate topics using URL deduplication
+- Logs discovery operations
+
+### Curator
+
+- Evaluates candidate topics
+- Applies deterministic scoring
+- Scores based on:
+  - Novelty
+  - Timeliness
+  - Persona relevance
+  - Source quality
+  - Duplicate penalty
+- Explicitly rejects low-quality topics
+- Stores rejection reasoning
+
+### Researcher
+
+- Retrieves detailed article information
+- Extracts structured facts
+- Produces summaries and key points
+- Associates extracted facts with their original source URLs
+
+### Additional Improvements
+
+- Added AI/Technology relevance filtering
+- Rejected:
+  - Coupons
+  - Promo codes
+  - Deals
+  - Shopping content
+  - Entertainment
+  - Non-technical articles
+- Improved overall topic quality
+
+---
+
+## Human Review
+
+Verified that:
+
+- Project builds successfully
+- Scout fetches live RSS feeds
+- Multiple AI news sources are used
+- Candidate topics are stored in the database
+- Duplicate URL detection works
+- Running Scout twice does not insert duplicate topics
+- AI relevance filtering removes unrelated articles
+- Curator successfully evaluates discovered topics
+- Researcher prepares structured research data
+- Debug endpoint returns expected JSON output
+
+---
+
+## Manual Testing
+
+### Test 1
+
+Executed the Scout debug endpoint.
+
+Result:
+
+- Successfully returned live candidate topics.
+
+### Test 2
+
+Verified Topic table using Prisma Studio.
+
+Result:
+
+- Topics stored successfully.
+
+### Test 3
+
+Executed Scout twice.
+
+Result:
+
+- Duplicate detection prevented repeated inserts.
+
+### Test 4
+
+Verified AI relevance filtering.
+
+Result:
+
+- Non-AI content was excluded.
+
+---
+
+## Commit
+
+```text
+feat: implement autonomous intelligence pipeline
+```
+
+---

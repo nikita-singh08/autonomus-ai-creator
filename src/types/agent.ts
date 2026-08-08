@@ -114,6 +114,8 @@ export interface DraftResult {
 export interface CriticResult {
   pass: boolean;
   reason: string;
+  /** Quality score 0–100. Populated even when pass is false. */
+  score: number;
 }
 
 // --------------- API request/response shapes -----------------
