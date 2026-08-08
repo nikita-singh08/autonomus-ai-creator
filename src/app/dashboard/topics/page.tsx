@@ -132,9 +132,20 @@ export default async function TopicsPage() {
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                           <span style={{ color: "var(--cyan)", fontSize: 12 }}>🔗</span>
-                          <span style={{ fontSize: 12.5, color: "var(--cyan-text)", fontFamily: "var(--font-mono)" }}>
-                            {shortHost(topic.url)}
-                          </span>
+                          {topic.url ? (
+                            <a 
+                              href={topic.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ fontSize: 12.5, color: "var(--cyan-text)", fontFamily: "var(--font-mono)", textDecoration: "none" }}
+                            >
+                              {shortHost(topic.url)}
+                            </a>
+                          ) : (
+                            <span style={{ fontSize: 12.5, color: "var(--cyan-text)", fontFamily: "var(--font-mono)" }}>
+                              Unknown
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td>

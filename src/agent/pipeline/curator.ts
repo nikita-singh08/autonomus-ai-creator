@@ -108,14 +108,40 @@ function scorePersonaRelevance(
   persona: Persona
 ): { score: number; reason: string } {
   const haystack = `${candidate.title} ${candidate.snippet ?? ""}`.toLowerCase();
-  const hits = persona.pillars.filter((p) => haystack.includes(p.toLowerCase()));
+  
+  const PILLAR_DOMAIN_MAP: Record<string, string[]> = {
+    "artificial intelligence": ["ai", "machine learning", "ml"],
+    "machine learning": ["ai", "ml", "artificial intelligence"],
+    "software engineering": ["technology", "tech", "coding", "developer"],
+    "developer tools": ["technology", "opensource", "dev tools", "api", "sdk"],
+    "open source": ["opensource", "foss", "github"],
+    "systems design": ["systems", "architecture"],
+  };
+  
+  const phrases = [
+    persona.domain.toLowerCase(), 
+    ...persona.pillars.map(p => p.toLowerCase())
+  ].filter(p => p.trim().length > 0);
+  
+  const expandedPhrases = [...phrases];
+  for (const pillar of persona.pillars.map(p => p.toLowerCase())) {
+    if (PILLAR_DOMAIN_MAP[pillar]) {
+      expandedPhrases.push(...PILLAR_DOMAIN_MAP[pillar]);
+    }
+  }
+  
+  const dynamicKeywords = new Set(expandedPhrases);
 
-  const score = Math.min(25, hits.length * 8 + (hits.length > 0 ? 5 : 0));
-  const reason =
-    hits.length > 0
-      ? `matches pillars: ${hits.join(", ")}`
-      : "no pillar keywords found in title/snippet";
-  return { score, reason };
+  const hits = Array.from(dynamicKeywords).filter((kw) => {
+    return new RegExp(`\\b${kw.replace(/[-\\/\\\\^$*+?.()|[\\]{}]/g, '\\\\$&')}\\b`, 'i').test(haystack);
+  });
+
+  if (hits.length === 0) {
+    return { score: -50, reason: "completely irrelevant to domain and pillars" };
+  }
+
+  const score = Math.min(25, hits.length * 5 + 5);
+  return { score, reason: `matches keywords: ${hits.slice(0, 3).join(", ")}` };
 }
 
 /**

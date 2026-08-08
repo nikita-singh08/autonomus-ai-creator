@@ -29,28 +29,20 @@ const REJECT_KEYWORDS = [
   "coupon",
   "deal",
   "promo code",
+  "promocode",
+  "discount",
   "buying guide",
+  "gift guide",
   "tv show",
   "streaming",
   "entertainment",
   "shopping",
+  "affiliate",
+  "black friday",
+  "cyber monday",
 ];
 
-/** Keywords that strongly signal AI/Tech relevance. */
-const ACCEPT_KEYWORDS = [
-  "artificial intelligence",
-  "llm",
-  "robotics",
-  "machine learning",
-  "open source",
-  "programming",
-  "software engineering",
-  "cloud",
-  "security",
-  "ai product",
-  "developer tool",
-  "research",
-];
+// ACCEPT_KEYWORDS removed: relevance is now dynamically driven by the persona
 
 // --------------- Helpers ----------------------------------
 
@@ -127,21 +119,53 @@ function isRecent(publishedAt?: Date): boolean {
 }
 
 /**
- * Return true if the item's title or snippet contains any AI/Tech accept keyword,
- * and contains NO reject keywords like coupons or deals.
+ * Return true if the item's title or snippet contains any keyword from the
+ * persona's domain or pillars, and contains NO reject keywords like coupons.
  */
-function isRelevantTopic(title: string, snippet?: string): boolean {
+function isRelevantTopic(title: string, snippet: string | undefined, persona: Persona): boolean {
   const combined = `${title} ${snippet ?? ""}`.toLowerCase();
   
-  if (REJECT_KEYWORDS.some((kw) => combined.includes(kw))) {
+  const hasRejectKeyword = REJECT_KEYWORDS.some((kw) => {
+    // Use word boundaries and optional 's' for plurals (e.g., "deals", "coupons")
+    return new RegExp(`\\b${kw}s?\\b`, "i").test(combined);
+  });
+
+  if (hasRejectKeyword) {
     return false;
   }
   
-  if (ACCEPT_KEYWORDS.some((kw) => combined.includes(kw))) {
-    return true;
+  // Also map pillars to their common abbreviations so we don't reject everything
+  const PILLAR_DOMAIN_MAP: Record<string, string[]> = {
+    "artificial intelligence": ["ai", "machine learning", "ml"],
+    "machine learning": ["ai", "ml", "artificial intelligence"],
+    "software engineering": ["technology", "tech", "coding", "developer"],
+    "developer tools": ["technology", "opensource", "dev tools", "api", "sdk"],
+    "open source": ["opensource", "foss", "github"],
+    "systems design": ["systems", "architecture"],
+  };
+  
+  const phrases = [
+    persona.domain.toLowerCase(), 
+    ...persona.pillars.map(p => p.toLowerCase())
+  ].filter(p => p.trim().length > 0);
+  
+  // Expand with synonyms/abbreviations based on exact pillar match
+  const expandedPhrases = [...phrases];
+  for (const pillar of persona.pillars.map(p => p.toLowerCase())) {
+    if (PILLAR_DOMAIN_MAP[pillar]) {
+      expandedPhrases.push(...PILLAR_DOMAIN_MAP[pillar]);
+    }
   }
   
-  return false;
+  const dynamicKeywords = new Set(expandedPhrases);
+
+  const hasMeaningfulConnection = Array.from(dynamicKeywords).some((kw) => {
+    // For full phrases, simple includes is usually safe, 
+    // but word boundaries prevent partial word matches
+    return new RegExp(`\\b${kw.replace(/[-\\/\\\\^$*+?.()|[\\]{}]/g, '\\\\$&')}\\b`, 'i').test(combined);
+  });
+
+  return hasMeaningfulConnection;
 }
 
 // --------------- Public API --------------------------------
@@ -200,7 +224,7 @@ export async function discover(
   const filtered = rawItems.filter((item) => {
     if (!isRecent(item.publishedAt)) return false;
     if (isAntiTopic(item.title, item.url, persona.antiTopics)) return false;
-    if (!isRelevantTopic(item.title, item.snippet)) return false;
+    if (!isRelevantTopic(item.title, item.snippet, persona)) return false;
     return true;
   });
 
