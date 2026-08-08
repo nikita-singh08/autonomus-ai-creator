@@ -15,9 +15,9 @@ datasource db {
 model Agent {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
-  personaId String   // FK to the current active Persona version
+  personaId String?  // FK to the current active Persona version
 
-  persona  Persona   @relation("CurrentPersona", fields: [personaId], references: [id])
+  persona  Persona?  @relation("CurrentPersona", fields: [personaId], references: [id])
   personas Persona[] @relation("AgentPersonas")
   topics   Topic[]
   posts    Post[]

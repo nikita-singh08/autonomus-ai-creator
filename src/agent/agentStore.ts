@@ -51,23 +51,6 @@ const DEFAULT_ANTI_TOPICS: string[] = [
   "NFTs",
 ];
 
-/**
- * Initialise a new Agent + Persona v1 row.
- *
- * The schema has a circular FK:
- *   Agent.personaId → Persona.id
- *   Persona.agentId → Agent.id
- *
- * Strategy (cross-database safe):
- *   1. Detect whether we're on SQLite or PostgreSQL.
- *   2. On SQLite: use PRAGMA defer_foreign_keys = ON inside a transaction.
- *   3. On PostgreSQL: use SET CONSTRAINTS ALL DEFERRED inside a transaction.
- *
- * Both paths result in the same three logical operations:
- *   a. Create Persona with a placeholder agentId ("__pending__")
- *   b. Create Agent pointing at that Persona
- *   c. Patch Persona.agentId to the real Agent.id
- */
 export async function initAgent(input: InitPersonaInput): Promise<InitAgentResult> {
   const { name, domain } = input;
 
@@ -95,79 +78,35 @@ export async function initAgent(input: InitPersonaInput): Promise<InitAgentResul
       ? NOVA_PERSONA_SEED.antiTopics
       : DEFAULT_ANTI_TOPICS;
 
-  // Detect which database provider is in use.
-  const DATABASE_URL = process.env.DATABASE_URL ?? "file:./prisma/dev.db";
-  const isPostgres = !DATABASE_URL.startsWith("file:");
-
-  const TEMP_AGENT_ID = "__pending__";
-
-  let agentId: string;
-
-  if (isPostgres) {
-    // ── PostgreSQL path ────────────────────────────────────────────────
-    // PostgreSQL supports deferrable FK constraints.  We defer ALL
-    // constraints until the end of the transaction using a raw SQL
-    // statement.  This lets us insert the circular reference safely.
-    agentId = await prisma.$transaction(async (tx) => {
-      // Defer all FK constraints to end-of-transaction.
-      await tx.$executeRaw`SET CONSTRAINTS ALL DEFERRED`;
-
-      const persona = await tx.persona.create({
-        data: {
-          agentId: TEMP_AGENT_ID,
-          version: NOVA_PERSONA_SEED.version,
-          name,
-          domain,
-          voiceRules,
-          pillars,
-          antiTopics,
-        },
-      });
-
-      const agent = await tx.agent.create({
-        data: { personaId: persona.id },
-      });
-
-      await tx.persona.update({
-        where: { id: persona.id },
-        data:  { agentId: agent.id },
-      });
-
-      return agent.id;
+  // Since Agent.personaId is now optional, we can break the circular dependency
+  // without database-specific constraint deferral hacks.
+  const agentId = await prisma.$transaction(async (tx) => {
+    // 1. Create the Agent first, leaving personaId null.
+    const agent = await tx.agent.create({
+      data: {},
     });
-  } else {
-    // ── SQLite path (local development) ───────────────────────────────
-    // SQLite enforces FKs at statement level inside transactions.
-    // PRAGMA defer_foreign_keys = ON defers them until the transaction
-    // commits, breaking the circular dependency safely.
-    const result = await prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`PRAGMA defer_foreign_keys = ON;`;
 
-      const persona = await tx.persona.create({
-        data: {
-          agentId: TEMP_AGENT_ID,
-          version: NOVA_PERSONA_SEED.version,
-          name,
-          domain,
-          voiceRules,
-          pillars,
-          antiTopics,
-        },
-      });
-
-      const agent = await tx.agent.create({
-        data: { personaId: persona.id },
-      });
-
-      await tx.persona.update({
-        where: { id: persona.id },
-        data:  { agentId: agent.id },
-      });
-
-      return { agentId: agent.id };
+    // 2. Create the Persona pointing to the newly created Agent.
+    const persona = await tx.persona.create({
+      data: {
+        agentId: agent.id,
+        version: NOVA_PERSONA_SEED.version,
+        name,
+        domain,
+        voiceRules,
+        pillars,
+        antiTopics,
+      },
     });
-    agentId = result.agentId;
-  }
+
+    // 3. Update the Agent with the active personaId.
+    await tx.agent.update({
+      where: { id: agent.id },
+      data:  { personaId: persona.id },
+    });
+
+    return agent.id;
+  });
 
   logger.info("initAgent: created agent + persona v1", { agentId, name, domain });
   return { agentId };
@@ -177,5 +116,6 @@ export async function initAgent(input: InitPersonaInput): Promise<InitAgentResul
 export async function findAgent(agentId: string): Promise<Agent | null> {
   const row = await prisma.agent.findUnique({ where: { id: agentId } });
   if (!row) return null;
+  if (!row.personaId) throw new Error("Agent missing personaId (init incomplete)");
   return { id: row.id, createdAt: row.createdAt, personaId: row.personaId };
 }

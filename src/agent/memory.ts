@@ -159,6 +159,7 @@ export async function getAgent(agentId: string): Promise<Agent | null> {
     where: { id: agentId },
   });
   if (!row) return null;
+  if (!row.personaId) throw new Error("Agent missing personaId (init incomplete)");
   return {
     id: row.id,
     createdAt: row.createdAt,
@@ -176,6 +177,7 @@ export async function getPersona(agentId: string): Promise<Persona> {
     include: { persona: true },
   });
   if (!agent) throw new Error(`memory.getPersona: Agent not found: ${agentId}`);
+  if (!agent.persona) throw new Error(`memory.getPersona: Agent missing persona: ${agentId}`);
   return toPersona(agent.persona);
 }
 

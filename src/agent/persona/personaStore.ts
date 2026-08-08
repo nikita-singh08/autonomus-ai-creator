@@ -68,5 +68,8 @@ export async function getActivePersona(agentId: string): Promise<Persona> {
   if (!agent) {
     throw new Error(`Agent not found: ${agentId}`);
   }
+  if (!agent.persona) {
+    throw new Error(`Agent missing persona: ${agentId}`);
+  }
   return toPersona(agent.persona);
 }
