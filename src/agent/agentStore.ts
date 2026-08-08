@@ -16,26 +16,6 @@ export interface InitAgentResult {
 }
 
 /**
- * Initialise a new Agent + Persona v1 row.
- *
- * The schema has a circular FK:
- *   Agent.personaId → Persona.id
- *   Persona.agentId → Agent.id
- *
- * SQLite enforces FKs immediately even inside a transaction.
- * We break the cycle by temporarily disabling FK checks with
- * PRAGMA foreign_keys = OFF, running the three inserts, then
- * re-enabling.  This is safe because we verify the final state
- * is consistent before re-enabling.
- *
- * Steps:
- *   1. Disable FK checks (PRAGMA foreign_keys = OFF)
- *   2. Create Persona with a placeholder agentId
- *   3. Create Agent pointing at that Persona
- *   4. Patch Persona.agentId to the real Agent.id
- *   5. Re-enable FK checks (PRAGMA foreign_keys = ON)
- */
-/**
  * Default voiceRules written to every new Persona.
  * Matches the schema expected by writer.ts and memory.ts toVoiceRules().
  */
@@ -78,25 +58,20 @@ const DEFAULT_ANTI_TOPICS: string[] = [
  *   Agent.personaId → Persona.id
  *   Persona.agentId → Agent.id
  *
- * SQLite enforces FKs immediately even inside a transaction.
- * We break the cycle by temporarily disabling FK checks with
- * PRAGMA foreign_keys = OFF, running the three inserts, then
- * re-enabling.  This is safe because we verify the final state
- * is consistent before re-enabling.
+ * Strategy (cross-database safe):
+ *   1. Detect whether we're on SQLite or PostgreSQL.
+ *   2. On SQLite: use PRAGMA defer_foreign_keys = ON inside a transaction.
+ *   3. On PostgreSQL: use SET CONSTRAINTS ALL DEFERRED inside a transaction.
  *
- * Steps:
- *   1. Disable FK checks (PRAGMA foreign_keys = OFF)
- *   2. Create Persona with a placeholder agentId
- *   3. Create Agent pointing at that Persona
- *   4. Patch Persona.agentId to the real Agent.id
- *   5. Re-enable FK checks (PRAGMA foreign_keys = ON)
+ * Both paths result in the same three logical operations:
+ *   a. Create Persona with a placeholder agentId ("__pending__")
+ *   b. Create Agent pointing at that Persona
+ *   c. Patch Persona.agentId to the real Agent.id
  */
 export async function initAgent(input: InitPersonaInput): Promise<InitAgentResult> {
   const { name, domain } = input;
 
-  // Build persona data from the seed, overriding name+domain with caller input.
-  // voiceRules, pillars, antiTopics always come from the seed / defaults so
-  // no Persona row can ever be written with missing JSON fields.
+  // Resolve persona config — always use seed + defaults so JSON fields are complete.
   const seedVoiceRules = NOVA_PERSONA_SEED.voiceRules;
   const voiceRules: Prisma.InputJsonValue =
     seedVoiceRules &&
@@ -104,9 +79,9 @@ export async function initAgent(input: InitPersonaInput): Promise<InitAgentResul
     typeof seedVoiceRules.toneDescription === "string" &&
     typeof seedVoiceRules.styleNotes === "string"
       ? {
-          bannedPhrases: seedVoiceRules.bannedPhrases,
-          toneDescription: seedVoiceRules.toneDescription,
-          styleNotes: seedVoiceRules.styleNotes,
+          bannedPhrases:    seedVoiceRules.bannedPhrases,
+          toneDescription:  seedVoiceRules.toneDescription,
+          styleNotes:       seedVoiceRules.styleNotes,
         }
       : DEFAULT_VOICE_RULES;
 
@@ -120,41 +95,79 @@ export async function initAgent(input: InitPersonaInput): Promise<InitAgentResul
       ? NOVA_PERSONA_SEED.antiTopics
       : DEFAULT_ANTI_TOPICS;
 
-  // Use $transaction with interactive mode so we can interleave
-  // raw SQL PRAGMAs with Prisma model operations.
-  const { agentId } = await prisma.$transaction(async (tx) => {
-    // Defer FK enforcement until transaction commit so we can insert
-    // the circular reference without a constraint violation.
-    await tx.$executeRaw`PRAGMA defer_foreign_keys = ON;`;
+  // Detect which database provider is in use.
+  const DATABASE_URL = process.env.DATABASE_URL ?? "file:./prisma/dev.db";
+  const isPostgres = !DATABASE_URL.startsWith("file:");
 
-    // Create Persona first with a temporary placeholder agentId.
-    // The FK from Persona.agentId → Agent.id is not checked yet.
-    const TEMP_AGENT_ID = "__pending__";
-    const persona = await tx.persona.create({
-      data: {
-        agentId: TEMP_AGENT_ID,
-        version: NOVA_PERSONA_SEED.version,
-        name,
-        domain,
-        voiceRules,
-        pillars,
-        antiTopics,
-      },
+  const TEMP_AGENT_ID = "__pending__";
+
+  let agentId: string;
+
+  if (isPostgres) {
+    // ── PostgreSQL path ────────────────────────────────────────────────
+    // PostgreSQL supports deferrable FK constraints.  We defer ALL
+    // constraints until the end of the transaction using a raw SQL
+    // statement.  This lets us insert the circular reference safely.
+    agentId = await prisma.$transaction(async (tx) => {
+      // Defer all FK constraints to end-of-transaction.
+      await tx.$executeRaw`SET CONSTRAINTS ALL DEFERRED`;
+
+      const persona = await tx.persona.create({
+        data: {
+          agentId: TEMP_AGENT_ID,
+          version: NOVA_PERSONA_SEED.version,
+          name,
+          domain,
+          voiceRules,
+          pillars,
+          antiTopics,
+        },
+      });
+
+      const agent = await tx.agent.create({
+        data: { personaId: persona.id },
+      });
+
+      await tx.persona.update({
+        where: { id: persona.id },
+        data:  { agentId: agent.id },
+      });
+
+      return agent.id;
     });
+  } else {
+    // ── SQLite path (local development) ───────────────────────────────
+    // SQLite enforces FKs at statement level inside transactions.
+    // PRAGMA defer_foreign_keys = ON defers them until the transaction
+    // commits, breaking the circular dependency safely.
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`PRAGMA defer_foreign_keys = ON;`;
 
-    // Create Agent pointing at the Persona we just created.
-    const agent = await tx.agent.create({
-      data: { personaId: persona.id },
+      const persona = await tx.persona.create({
+        data: {
+          agentId: TEMP_AGENT_ID,
+          version: NOVA_PERSONA_SEED.version,
+          name,
+          domain,
+          voiceRules,
+          pillars,
+          antiTopics,
+        },
+      });
+
+      const agent = await tx.agent.create({
+        data: { personaId: persona.id },
+      });
+
+      await tx.persona.update({
+        where: { id: persona.id },
+        data:  { agentId: agent.id },
+      });
+
+      return { agentId: agent.id };
     });
-
-    // Patch Persona.agentId to the real Agent id.
-    await tx.persona.update({
-      where: { id: persona.id },
-      data: { agentId: agent.id },
-    });
-
-    return { agentId: agent.id };
-  });
+    agentId = result.agentId;
+  }
 
   logger.info("initAgent: created agent + persona v1", { agentId, name, domain });
   return { agentId };

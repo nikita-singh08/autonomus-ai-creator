@@ -38,7 +38,7 @@ model Persona {
   antiTopics Json     // string[]  — topics the agent refuses
   createdAt  DateTime @default(now())
 
-  agentRef     Agent   @relation("AgentPersonas", fields: [agentId], references: [id])
+  agentRef     Agent   @relation("AgentPersonas", fields: [agentId], references: [id], onDelete: Cascade)
   agentCurrent Agent[] @relation("CurrentPersona")
 }
 

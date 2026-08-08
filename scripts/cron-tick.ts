@@ -7,16 +7,19 @@
 // others — each agent is processed independently.
 //
 // Compatible scheduler environments (provider-independent):
-//   - GitHub Actions  (schedule: cron: '...')
-//   - Railway cron    (runs this script directly)
-//   - cron-job.org    (hits POST /api/agent/tick instead)
-//   - Any POSIX cron  (npx tsx scripts/cron-tick.ts)
+//   - Render Cron Job  (command: npx tsx scripts/cron-tick.ts)
+//   - GitHub Actions   (schedule: cron: '*/10 * * * *')
+//   - Railway cron     (runs this script directly)
+//   - Any POSIX cron   (npx tsx scripts/cron-tick.ts)
 //
 // Required environment variables:
-//   DATABASE_URL  — Prisma SQLite path (file:./prisma/dev.db)
+//   DATABASE_URL  — PostgreSQL connection string in production
+//                   (e.g. postgresql://user:pass@host:5432/db?sslmode=require)
+//                   OR SQLite file path for local dev (file:./prisma/dev.db)
 //   GROQ_API_KEY  — LLM provider key
 //
 // Optional: set AGENT_ID to restrict execution to a single agent.
+// Recommended schedule for hackathon evaluation: every 10 minutes.
 // ============================================================
 
 import { runTick } from "../src/agent/orchestrator";
