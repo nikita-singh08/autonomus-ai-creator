@@ -999,4 +999,562 @@ Result:
 feat: implement autonomous intelligence pipeline
 ```
 
+
+# Prompt 6
+
+## Tool
+
+Antigravity
+
+---
+
+## Purpose
+
+Implement the Autonomous Publishing Layer of the Autonomous AI Creator.
+
+This phase transforms researched topics into high-quality publishable posts by introducing content generation, quality validation, and database persistence.
+
+---
+
+## Prompt
+
+```text
+You are continuing an existing production-grade codebase.
+
+IMPORTANT
+
+Do NOT redesign the project.
+
+Do NOT rename files.
+
+Do NOT change folder structure.
+
+Follow the existing architecture.
+
+Implement ONLY Phase 2.
+
+=================================================
+
+PROJECT
+
+Autonomous AI Creator
+
+=================================================
+
+CURRENT STATUS
+
+Already implemented
+
+✓ Prisma
+
+✓ Agent Initialization
+
+✓ Feed Endpoint
+
+✓ Scout
+
+✓ Curator
+
+✓ Researcher
+
+=================================================
+
+YOUR TASK
+
+Implement the complete Autonomous Publishing Layer.
+
+Only implement
+
+1. Writer
+
+2. Critic
+
+3. Publisher
+
+=================================================
+
+WRITER
+
+Implement
+
+src/agent/pipeline/writer.ts
+
+Responsibilities
+
+Receive
+
+- Persona
+- Selected Topic
+- Research Result
+
+Generate a high-quality post.
+
+Requirements
+
+The generated post must
+
+• stay under 300 words
+
+• have a strong opening
+
+• sound like a real AI/Tech expert
+
+• never sound like marketing
+
+• include useful insight
+
+• maintain the same editorial voice
+
+• avoid repeating previous posts
+
+Generate
+
+text
+
+rationale
+
+The rationale must explain
+
+Why this topic was selected.
+
+Why it matters now.
+
+Why readers should care.
+
+=================================================
+
+CRITIC
+
+Implement
+
+src/agent/pipeline/critic.ts
+
+Responsibilities
+
+Evaluate the generated draft.
+
+Run deterministic quality checks.
+
+Checks
+
+✓ Minimum length
+
+✓ Maximum length
+
+✓ Duplicate similarity
+
+✓ Empty rationale
+
+✓ Missing sources
+
+✓ Broken references
+
+✓ Low quality text
+
+Return
+
+pass
+
+reason
+
+score
+
+If the draft fails
+
+Reject publication.
+
+=================================================
+
+PUBLISHER
+
+Implement
+
+src/agent/pipeline/publisher.ts
+
+Responsibilities
+
+Persist successful drafts.
+
+Create
+
+Post
+
+records.
+
+Persist
+
+text
+
+rationale
+
+sources
+
+createdAt
+
+topicId
+
+agentId
+
+Mark the Topic
+
+status
+
+=
+
+published
+
+=================================================
+
+DATABASE
+
+Update
+
+Topic
+
+Post
+
+Source
+
+tables
+
+=================================================
+
+ORCHESTRATOR
+
+Connect
+
+Researcher
+
+↓
+
+Writer
+
+↓
+
+Critic
+
+↓
+
+Publisher
+
+The orchestration should support
+
+manual execution.
+
+Do NOT add background scheduling.
+
+=================================================
+
+TESTING
+
+Create a temporary debug endpoint
+
+GET
+
+/api/debug/publish
+
+The endpoint should
+
+Run
+
+Researcher
+
+↓
+
+Writer
+
+↓
+
+Critic
+
+↓
+
+Publisher
+
+Return
+
+{
+
+published:true,
+
+post:{...}
+
+}
+
+or
+
+{
+
+published:false,
+
+reason:"..."
+
+}
+
+=================================================
+
+ERROR HANDLING
+
+Handle
+
+Database failures
+
+Writer failures
+
+Critic failures
+
+Research failures
+
+Gracefully.
+
+=================================================
+
+LOGGING
+
+Writer Started
+
+Writer Finished
+
+Critic Started
+
+Critic Decision
+
+Publisher Started
+
+Publisher Finished
+
+=================================================
+
+DO NOT IMPLEMENT
+
+Scheduler
+
+Cron
+
+Memory
+
+Dashboard
+
+Autonomous Loop
+
+=================================================
+
+Everything must compile.
+
+Stop immediately after finishing Phase 2.
+```
+
+---
+
+## Follow-up Prompt 1
+
+```text
+Phase 2 testing exposed a runtime error.
+
+Current error:
+
+Cannot read properties of undefined (reading 'map')
+
+The error occurs when calling:
+
+GET /api/debug/publish
+
+Your task:
+
+1. Find exactly where `.map()` is being called on an undefined value.
+2. Fix the root cause instead of adding optional chaining everywhere.
+3. Ensure every pipeline stage returns the expected object shape.
+4. Validate that:
+   - Researcher always returns arrays for `facts`, `keyPoints`, and `sources` (empty arrays if no data).
+   - Writer receives valid research data.
+   - Publisher always receives a valid `sources` array.
+5. Add defensive validation between pipeline stages with meaningful error messages.
+6. Do not redesign the architecture.
+7. Do not implement new features.
+8. Stop after fixing this runtime error.
+```
+
+---
+
+## Follow-up Prompt 2
+
+```text
+The runtime logs identify the failure.
+
+Pipeline execution:
+
+✓ Researcher completed successfully.
+✓ Writer started successfully.
+
+The runtime error occurs inside:
+
+src/agent/pipeline/writer.ts
+
+Current error:
+
+Cannot read properties of undefined (reading 'map')
+
+Your task:
+
+1. Inspect writer.ts completely.
+2. Find every `.map()` call.
+3. Identify which variable can become undefined.
+4. Fix the root cause.
+5. Do NOT use optional chaining (`?.map`) as a workaround.
+6. Ensure Writer accepts the exact object returned by Researcher.
+7. Validate the input schema before processing.
+8. If Researcher and Writer use different property names (for example `keyPoints` vs `points`, `sources` vs `references`), make them consistent.
+9. Add a descriptive validation error if the input object is malformed.
+10. Do not modify Curator, Publisher, Scheduler, or any unrelated module.
+
+Stop after fixing writer.ts.
+```
+
+---
+
+## Expected Scope
+
+Implement only:
+
+- Writer
+- Critic
+- Publisher
+
+Do not implement:
+
+- Scheduler
+- Memory
+- Autonomous Loop
+- Dashboard
+
+---
+
+## Output Used
+
+### Writer
+
+- Accepts Persona, Topic, and ResearchResult
+- Generates AI-powered posts
+- Produces publishing rationale
+- Maintains a consistent editorial voice
+- Integrates with the shared LLM wrapper (`src/lib/llm.ts`)
+
+### Critic
+
+- Evaluates generated drafts
+- Performs deterministic quality validation
+- Checks:
+  - Length
+  - Duplicate similarity
+  - Empty rationale
+  - Missing sources
+  - Overall content quality
+- Returns structured pass/fail decisions
+
+### Publisher
+
+- Persists approved posts
+- Saves:
+  - Post text
+  - Rationale
+  - Sources
+  - Topic association
+  - Agent association
+- Marks topics as published
+- Stores source metadata
+
+### Orchestration
+
+- Connected:
+  Researcher
+  → Writer
+  → Critic
+  → Publisher
+
+### Debugging
+
+Implemented temporary endpoint:
+
+```
+GET /api/debug/publish
+```
+
+Used for manual verification of the publishing pipeline.
+
+---
+
+## Human Review
+
+Verified:
+
+- Writer module implemented successfully.
+- Critic module implemented successfully.
+- Publisher module implemented successfully.
+- Publishing pipeline executes through all stages.
+- Runtime validation issues were resolved.
+- Persona schema compatibility was improved.
+- Writer receives normalized Persona configuration.
+- Pipeline now reaches the LLM layer successfully.
+
+Current Configuration Requirement:
+
+- A valid `GROQ_API_KEY` is required for end-to-end AI content generation.
+- This is an environment configuration step and will be completed before deployment.
+- No source code changes are required once the API key is configured.
+
+---
+
+## Manual Testing
+
+### Test 1
+
+Executed:
+
+```
+GET /api/debug/publish
+```
+
+Result:
+
+- Initial runtime validation errors identified and fixed.
+
+---
+
+### Test 2
+
+Verified Persona configuration.
+
+Result:
+
+- Missing `voiceRules` defaults handled correctly.
+
+---
+
+### Test 3
+
+Verified Writer initialization.
+
+Result:
+
+- Publishing pipeline successfully reaches the LLM client.
+
+---
+
+### Test 4
+
+Verified dependency changes.
+
+Result:
+
+- No additional npm packages were introduced during Phase 2.
+- Existing project dependencies were sufficient.
+
+---
+
+## Commit
+
+```text
+feat: implement autonomous publishing pipeline
+```
+
 ---
