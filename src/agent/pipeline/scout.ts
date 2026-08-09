@@ -22,7 +22,7 @@ import type { RssSource } from "@/config/sources";
 const MAX_CANDIDATES = 50;
 
 /** Feeds older than this are considered stale and filtered out. */
-const MAX_AGE_HOURS = 72;
+const MAX_AGE_HOURS = 720;
 
 /** Keywords that disqualify an article immediately (e.g., consumer junk). */
 const REJECT_KEYWORDS = [
@@ -249,7 +249,12 @@ export async function discover(
 
   if (deduped.length === 0) {
     logger.info("scout: no new candidates after deduplication", { agentId });
-    logger.info("scout: Scout Finished", { agentId, candidateCount: 0 });
+    logger.info("scout: Scout Finished", { 
+      agentId, 
+      candidateCount: 0,
+      afterFilter: filtered.length,
+      afterDedupe: deduped.length
+    });
     return [];
   }
 
