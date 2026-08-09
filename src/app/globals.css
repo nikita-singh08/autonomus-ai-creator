@@ -912,6 +912,34 @@ input, select, textarea { font-family: inherit; }
 
 @media (max-width: 600px) {
   .grid-3, .grid-4, .grid-2 { grid-template-columns: 1fr; }
+  .layout-post-detail { grid-template-columns: 1fr; }
   .page-content { padding: 16px 14px 32px; }
   .page-title { font-size: 22px; }
+}
+
+.layout-post-detail {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 20px;
+}
+
+.layout-activity-row, .layout-activity-header {
+  display: grid;
+  grid-template-columns: 130px 100px 80px 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .layout-post-detail {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .layout-activity-row {
+    grid-template-columns: 130px 1fr;
+  }
+  .layout-activity-header {
+    display: none;
+  }
 }

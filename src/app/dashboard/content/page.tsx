@@ -146,9 +146,14 @@ export default async function ContentPage() {
                         {sources.slice(0, 4).map((url, i) => (
                           <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
                             <span style={{ color: "var(--cyan)", fontSize: 11, flexShrink: 0 }}>↗</span>
-                            <span style={{ fontSize: 12, color: "var(--cyan-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ fontSize: 12, color: "var(--cyan-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: "none" }}
+                            >
                               {hostOf(url)}
-                            </span>
+                            </a>
                           </div>
                         ))}
                       </div>

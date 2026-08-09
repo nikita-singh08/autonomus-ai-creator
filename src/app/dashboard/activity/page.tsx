@@ -154,10 +154,7 @@ export default async function ActivityPage() {
         ) : (
           <>
             {/* Table header */}
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "130px 100px 80px 1fr",
-              gap: 12,
+            <div className="layout-activity-header" style={{
               padding: "12px 20px",
               borderBottom: "1px solid var(--border)",
             }}>
@@ -192,10 +189,8 @@ export default async function ActivityPage() {
                 return (
                   <div
                     key={tick.id}
+                    className="layout-activity-row"
                     style={{
-                      display: "grid",
-                      gridTemplateColumns: "130px 100px 80px 1fr",
-                      gap: 12,
                       padding: "14px 20px",
                       alignItems: "center",
                       position: "relative",

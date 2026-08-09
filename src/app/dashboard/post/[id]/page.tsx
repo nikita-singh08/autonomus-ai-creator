@@ -85,7 +85,7 @@ export default async function PostDetailPage({
       </div>
 
       {/* Two-column layout */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 20 }}>
+      <div className="layout-post-detail">
         {/* Left column */}
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           {/* Generated Content */}

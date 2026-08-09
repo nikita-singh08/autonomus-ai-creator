@@ -219,7 +219,7 @@ export default async function SettingsPage() {
             </div>
 
             <div style={{ marginTop: 14, padding: "9px 14px", borderRadius: "var(--radius-md)", background: "var(--primary-dim)", border: "1px solid rgba(99,102,241,0.25)", fontSize: 12.5, color: "var(--primary-text)" }}>
-              ℹ️  Schedule configuration is read-only. Edit <code>scripts/cron-tick.ts</code> to modify schedule behaviour.
+              ℹ️  Schedule configuration is read-only. Edit <code>scripts/cron-tick.ts</code> to modify schedule behavior.
             </div>
           </div>
         </div>
