@@ -6,7 +6,7 @@
 
 ## 🔗 Project Links
 
-- **Live Demo:** [autonomous-ai-creator.onrender.com](https://autonomous-ai-creator.onrender.com)
+- **Live Demo:** [autonomus-ai-creator-theta.vercel.app](https://autonomus-ai-creator-theta.vercel.app)
 - **GitHub Repository:** [nikita-singh08/autonomus-ai-creator](https://github.com/nikita-singh08/autonomus-ai-creator)
 - **AI Usage Log / Prompts:** [PROMPTS.md](./PROMPTS.md)
 - **Architecture:** [ARCHITECTURE.md](./ARCHITECTURE.md)
