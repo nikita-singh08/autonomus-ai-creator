@@ -17,30 +17,37 @@ import type { TickRequest } from "@/types/agent";
 export async function POST(req: NextRequest) {
   try {
     const body: TickRequest = await req.json().catch(() => ({}));
-    const { agentId } = body;
+    let targetAgentId = body.agentId;
 
-    if (!agentId) {
-      return NextResponse.json(
-        { error: "Missing required body field: agentId" },
-        { status: 400 }
-      );
+    if (!targetAgentId) {
+      const latestAgent = await prisma.agent.findFirst({
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      });
+      if (!latestAgent) {
+        return NextResponse.json(
+          { success: false, error: "No agents initialized yet" },
+          { status: 404 }
+        );
+      }
+      targetAgentId = latestAgent.id;
     }
 
-    logger.info("POST /api/agent/tick received", { agentId });
+    logger.info("POST /api/agent/tick received", { targetAgentId });
 
     // Validate the agent exists before firing the cycle.
     const agent = await prisma.agent.findUnique({
-      where: { id: agentId },
+      where: { id: targetAgentId },
       select: { id: true },
     });
     if (!agent) {
       return NextResponse.json(
-        { success: false, error: `Agent not found: ${agentId}` },
+        { success: false, error: `Agent not found: ${targetAgentId}` },
         { status: 404 }
       );
     }
 
-    const result = await runTick(agentId);
+    const result = await runTick(targetAgentId);
 
     return NextResponse.json(
       {

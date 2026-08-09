@@ -2031,3 +2031,668 @@ Run:
 
 ```bash
 npm run build
+
+---
+
+# Prompt 10 — Final Hackathon Compliance & Autonomous Agent Evaluation Fix
+
+**Tool:** Antigravity
+
+**Purpose:** Final hackathon-compliance audit and fix for autonomous agent evaluation.
+
+**Prompt:**
+FINAL HACKATHON COMPLIANCE FIX — DO NOT MAKE ANY OTHER FEATURE CHANGES
+
+This is the FINAL engineering change before hackathon submission.
+
+I need you to perform a complete hackathon-compliance audit of the existing autonomus-ai-creator project and fix ONLY issues that could cause the submitted project to fail the exact evaluation process described below.
+
+IMPORTANT:
+After this task is complete, I do NOT want another round of feature development, redesign, refactoring, or speculative improvements.
+
+The goal is:
+1. Make the evaluator-created agent operate autonomously for the evaluation period.
+2. Make every required API contract exactly correct.
+3. Preserve all currently working functionality.
+4. Make the minimum necessary code/configuration changes.
+5. Validate everything locally.
+6. DO NOT commit.
+7. DO NOT deploy.
+8. Report exactly what changed and why.
+
+============================================================
+HACKATHON EVALUATION CONTRACT
+============================================================
+
+The evaluator will:
+
+1. Call POST /api/agent/init EXACTLY ONCE.
+
+Request:
+
+{
+  "persona": {
+    "name": "Ada",
+    "domain": "AI Security"
+  }
+}
+
+Expected response:
+
+{
+  "agentId": "abc-123"
+}
+
+2. After initialization, the evaluator will NOT provide any more prompts or instructions.
+
+3. The evaluator will periodically call ONLY:
+
+GET /api/agent/feed?agentId=abc-123
+
+4. The evaluator will observe the system for approximately 48 hours.
+
+5. New posts must appear WITHOUT the evaluator calling /api/agent/tick.
+
+6. Previously returned posts must remain available.
+
+7. Feed must return newest posts first.
+
+8. Each post must contain:
+   - unique id
+   - ISO 8601 UTC createdAt
+   - text
+   - rationale
+   - sources
+
+9. The agent must autonomously:
+   - discover live AI/technology topics
+   - exercise editorial judgment
+   - reject unsuitable topics
+   - maintain a consistent AI/technology persona
+   - remember previously published content
+   - publish new content over time
+   - explain why each published topic was selected
+   - provide source URLs
+
+Real social media integration is NOT required.
+
+============================================================
+CRITICAL ISSUE ALREADY IDENTIFIED
+============================================================
+
+Current GitHub Actions workflow uses:
+
+AGENT_ID: ${{ secrets.AGENT_ID }}
+
+and calls:
+
+POST /api/agent/tick
+
+with:
+
+{
+  "agentId": "<fixed GitHub secret>"
+}
+
+This is NOT acceptable for the evaluator flow.
+
+The evaluator creates a NEW agent through /api/agent/init.
+
+The scheduler must autonomously operate on THAT evaluator-created agent.
+
+We must NOT depend on a manually configured fixed AGENT_ID secret.
+
+============================================================
+REQUIRED ARCHITECTURE
+============================================================
+
+Implement the minimum safe change so that:
+
+POST /api/agent/init
+        ↓
+creates evaluator's new Agent
+        ↓
+returns evaluatorAgentId
+        ↓
+GitHub Actions periodically triggers autonomous execution
+        ↓
+tick mechanism identifies the correct active/latest initialized agent
+        ↓
+runTick(evaluatorAgentId)
+        ↓
+Scout
+        ↓
+Curator
+        ↓
+Researcher
+        ↓
+Writer
+        ↓
+Critic
+        ↓
+Publisher / Hold
+        ↓
+Post stored for that same agentId
+        ↓
+GET /api/agent/feed?agentId=evaluatorAgentId
+        ↓
+evaluator sees new posts
+
+The evaluator must NOT need to call /api/agent/tick.
+
+============================================================
+TICK ENDPOINT REQUIREMENTS
+============================================================
+
+Inspect the existing:
+
+src/app/api/agent/tick/route.ts
+
+Current behavior requires agentId.
+
+Modify it minimally so that:
+
+A. If an explicit agentId is provided:
+   - preserve the existing behavior
+   - validate that the agent exists
+   - runTick(agentId)
+
+B. If agentId is NOT provided:
+   - safely identify the active/latest initialized agent using the existing database
+   - runTick() for that agent
+
+The evaluator creates exactly one agent before evaluation, so the autonomous scheduler must resolve to that newly initialized agent.
+
+Prefer using existing database structures and logic.
+
+DO NOT create unnecessary schema changes.
+
+DO NOT introduce a second agent-selection system.
+
+DO NOT create hardcoded test-agent IDs.
+
+If there is already an appropriate concept of active/latest agent in the codebase, reuse it.
+
+If multiple historical agents exist, ensure the newest valid initialized agent is selected for the autonomous evaluation cycle.
+
+If no agent exists, return a clear non-success response rather than crashing.
+
+============================================================
+GITHUB ACTIONS REQUIREMENTS
+============================================================
+
+Inspect:
+
+.github/workflows/agent-tick.yml
+
+Remove the dependency on the fixed AGENT_ID secret if the new tick mechanism no longer requires it.
+
+The scheduled workflow should retain:
+
+RENDER_URL
+
+and periodically call:
+
+POST "$RENDER_URL/api/agent/tick"
+
+without depending on a manually configured agent ID.
+
+Keep:
+
+schedule:
+  - cron: "17 * * * *"
+
+and:
+
+workflow_dispatch:
+
+unless there is a concrete reason they must change.
+
+The workflow must fail properly if the Render endpoint returns a non-2xx response.
+
+Do NOT change the scheduler cadence unnecessarily.
+
+Do NOT introduce another scheduler.
+
+GitHub Actions is the autonomous trigger.
+
+============================================================
+INIT ENDPOINT REQUIREMENTS
+============================================================
+
+Inspect:
+
+POST /api/agent/init
+
+It MUST remain compatible with:
+
+{
+  "persona": {
+    "name": "Ada",
+    "domain": "AI Security"
+  }
+}
+
+It must return:
+
+{
+  "agentId": "..."
+}
+
+The endpoint must create a valid Agent + Persona relationship.
+
+Do NOT break the PostgreSQL circular-dependency fix that was already implemented.
+
+Do NOT change the public API contract.
+
+============================================================
+FEED ENDPOINT REQUIREMENTS
+============================================================
+
+Inspect:
+
+GET /api/agent/feed?agentId=...
+
+Verify that:
+
+1. agentId is required.
+2. Missing agentId returns 400.
+3. Unknown agentId is handled safely.
+4. Only posts belonging to that agent are returned.
+5. Posts are ordered newest first.
+6. Previously published posts remain available.
+7. Empty feed returns:
+
+{
+  "posts": []
+}
+
+8. Each post has:
+   - id
+   - createdAt
+   - text
+   - rationale
+   - sources
+
+9. createdAt is a valid ISO 8601 UTC timestamp.
+10. id is unique.
+
+DO NOT change the public endpoint shape unless absolutely necessary.
+
+============================================================
+PERSONA REQUIREMENTS
+============================================================
+
+The evaluator supplies the persona name and domain.
+
+The resulting agent must remain focused on AI and technology.
+
+For:
+
+name = Ada
+domain = AI Security
+
+the autonomous content should remain meaningfully connected to AI Security / AI / technology.
+
+Do NOT hardcode "AI Security" into the system.
+
+The relevance system must remain dynamically driven by the configured persona/domain/pillars.
+
+Preserve the relevance fixes already implemented in:
+
+src/agent/pipeline/scout.ts
+src/agent/pipeline/curator.ts
+
+The existing fix successfully rejected:
+- gaming laptops
+- Android chargers
+- solar generators
+- promotional/coupon content
+
+and successfully allowed relevant AI/security content.
+
+DO NOT regress this behavior.
+
+============================================================
+EDITORIAL JUDGMENT
+============================================================
+
+The system must be allowed to HOLD when Scout finds no suitable topic.
+
+This is valid behavior.
+
+Do NOT force publication.
+
+A scheduled cycle with no suitable topic should safely result in a held/no-candidate outcome.
+
+Do NOT treat every discovered topic as publishable.
+
+============================================================
+MEMORY
+============================================================
+
+Verify that published content is persisted and used by the existing memory/deduplication system.
+
+The agent must avoid unnecessary repetition.
+
+Do NOT replace the existing memory implementation.
+
+Only fix it if the audit reveals a concrete violation of the hackathon requirements.
+
+============================================================
+PUBLISHING RATIONALE
+============================================================
+
+Verify every published post returned by /api/agent/feed contains a meaningful rationale explaining:
+
+1. Why the topic was selected.
+2. Why it is relevant now.
+3. Why it was chosen over alternatives when available.
+
+Verify sources are included as actual URLs.
+
+Do NOT fabricate sources.
+
+============================================================
+AUTONOMOUS PUBLISHING OVER TIME
+============================================================
+
+The system must NOT generate all content immediately during initialization.
+
+Initialization should only create the agent/persona and return agentId.
+
+Publishing must happen through subsequent autonomous scheduled ticks.
+
+The existing GitHub Actions hourly scheduler should continue triggering autonomous cycles.
+
+============================================================
+DASHBOARD / UI
+============================================================
+
+Preserve the existing working dashboard.
+
+Do NOT redesign anything.
+
+Do NOT change:
+- Dashboard
+- Activity
+- Topics
+- Content
+- Persona
+- Settings
+
+except if a change is strictly required to prevent a regression caused by this final fix.
+
+The Topics source-link fix must remain intact.
+
+Source domains must remain clickable and open the original source article in a new tab.
+
+============================================================
+PRODUCTION SAFETY
+============================================================
+
+Do NOT modify:
+- Prisma schema unless absolutely necessary
+- PostgreSQL architecture
+- existing Agent/Persona relationship fix
+- authentication
+- Render configuration
+- API contracts
+- Scout/Curator relevance logic except where required for compliance
+- Writer
+- Critic
+- Publisher
+- dashboard design
+
+Do NOT introduce mock data.
+
+Do NOT introduce fake posts.
+
+Do NOT hardcode an agentId.
+
+Do NOT hardcode a specific evaluator persona.
+
+Do NOT hardcode "AI Security" as the only allowed domain.
+
+============================================================
+MANDATORY END-TO-END TEST
+============================================================
+
+This is the most important validation.
+
+Simulate the REAL HACKATHON EVALUATION.
+
+STEP 1:
+Create a completely fresh agent using:
+
+POST /api/agent/init
+
+with:
+
+{
+  "persona": {
+    "name": "Ada",
+    "domain": "AI Security"
+  }
+}
+
+Record the returned NEW agentId.
+
+STEP 2:
+DO NOT manually call:
+
+POST /api/agent/tick
+
+with that agentId.
+
+Instead simulate the GitHub scheduler behavior by calling:
+
+POST /api/agent/tick
+
+WITHOUT an agentId.
+
+The endpoint must resolve the correct newly initialized agent automatically.
+
+STEP 3:
+Verify the autonomous tick runs successfully.
+
+STEP 4:
+Call:
+
+GET /api/agent/feed?agentId=<NEW_AGENT_ID>
+
+Verify that the feed belongs to that exact new agent.
+
+STEP 5:
+If the tick publishes:
+verify the returned post contains:
+- unique id
+- ISO UTC createdAt
+- text
+- rationale
+- sources
+
+STEP 6:
+Run another autonomous tick.
+
+Verify previously published posts remain available and are not replaced.
+
+STEP 7:
+Verify relevance:
+- irrelevant consumer/shopping topics are rejected
+- relevant AI/security topics can pass
+- no hardcoded title filtering is used
+
+STEP 8:
+Verify memory/deduplication remains functional.
+
+STEP 9:
+Verify the dashboard still loads.
+
+STEP 10:
+Verify source links still work.
+
+============================================================
+BUILD VALIDATION
+============================================================
+
+Run:
+
+npx tsc --noEmit
+
+It MUST pass.
+
+Run:
+
+npm run build
+
+It MUST pass.
+
+If either fails, fix only the issue caused by this final compliance change.
+
+============================================================
+GITHUB ACTION VALIDATION
+============================================================
+
+Verify the updated workflow is valid.
+
+Verify it can call:
+
+POST /api/agent/tick
+
+without a fixed AGENT_ID secret.
+
+Verify the scheduled workflow continues to run.
+
+Verify workflow_dispatch still works for manual testing.
+
+============================================================
+HACKATHON REQUIREMENTS AUDIT
+============================================================
+
+Before finishing, explicitly check every requirement:
+
+[ ] Live topic discovery
+[ ] Editorial judgment
+[ ] Intentional rejection of unsuitable topics
+[ ] Consistent AI/technology persona
+[ ] Stable voice
+[ ] Stable interests
+[ ] Editorial opinions
+[ ] Memory of published content
+[ ] Avoid unnecessary repetition
+[ ] Autonomous publishing
+[ ] Publishing over time
+[ ] No human prompt required after initialization
+[ ] Publishing rationale
+[ ] Current relevance explanation
+[ ] Source URLs
+[ ] Persistent feed
+[ ] Newest-first feed
+[ ] Unique post IDs
+[ ] ISO 8601 UTC timestamps
+[ ] Empty feed returns {"posts":[]}
+[ ] POST /api/agent/init contract
+[ ] GET /api/agent/feed contract
+[ ] Evaluator-created agent is the agent being autonomously ticked
+[ ] Public live demo remains functional
+[ ] Public repository remains accessible
+[ ] Existing AI Usage Log / PROMPTS.md remains intact
+[ ] No mock data
+[ ] No hardcoded evaluator agent ID
+[ ] No regression in existing dashboard
+[ ] No regression in source links
+[ ] TypeScript passes
+[ ] Production build passes
+
+If any item fails, fix it ONLY if it is required for the stated hackathon requirements.
+
+============================================================
+VERY IMPORTANT: FINAL CHANGE POLICY
+============================================================
+
+This is the FINAL implementation pass.
+
+Do NOT:
+- add new features
+- redesign the UI
+- optimize unrelated code
+- refactor unrelated code
+- change the visual design
+- change the pipeline architecture unnecessarily
+- change the scheduler cadence
+- add social media integrations
+- add analytics
+- add unnecessary dependencies
+- add unnecessary database tables
+- change working relevance logic
+- change working source-link logic
+
+Make the minimum necessary changes to guarantee compliance with the provided evaluation process.
+
+After all tests pass:
+
+DO NOT COMMIT.
+DO NOT PUSH.
+DO NOT DEPLOY.
+
+Give me a final report containing:
+
+1. Exact root cause of the fixed-agent/evaluator problem.
+2. Exact files changed.
+3. Exact behavior of the new autonomous agent-selection mechanism.
+4. Confirmation that evaluator-created agentId is used by scheduled autonomous execution.
+5. End-to-end test results using a fresh agent.
+6. Feed response validation.
+7. Relevance test results.
+8. Memory test results.
+9. TypeScript result.
+10. Production build result.
+11. GitHub Actions validation result.
+12. Confirmation that no unrelated features were changed.
+13. Confirmation that the project is ready for final submission.
+
+DO NOT say "ready" unless the fresh-agent end-to-end test actually passes.
+
+Perform the final hackathon-compliance audit of the existing Autonomous AI Creator project.
+
+The most important issue to fix is the autonomous evaluation flow. The hackathon evaluator will call `POST /api/agent/init` exactly once, receive a new `agentId`, and then only call `GET /api/agent/feed?agentId=<agentId>` for approximately 48 hours. The evaluator will not call `/api/agent/tick`.
+
+The current GitHub Actions scheduler uses a fixed `AGENT_ID` secret, which may point to a different test agent. Fix this so scheduled autonomous ticks operate on the evaluator-created/active agent instead of relying on a hardcoded agent ID.
+
+Requirements:
+- Preserve the existing `/api/agent/init` contract.
+- Preserve the existing `/api/agent/feed` contract.
+- Allow `/api/agent/tick` to resolve the active/latest initialized agent when no agentId is supplied.
+- Preserve explicit agentId support for manual/local testing if practical.
+- Update GitHub Actions so the scheduled tick does not depend on the fixed `AGENT_ID` secret.
+- Preserve the hourly scheduler and `workflow_dispatch`.
+- Preserve Scout/Curator relevance filtering.
+- Preserve persona consistency and memory/deduplication.
+- Preserve publishing rationale and source URLs.
+- Preserve the existing dashboard and clickable source links.
+- Do not add unrelated features or redesign anything.
+- Make only the minimum changes necessary for hackathon compliance.
+
+Perform a fresh end-to-end test that simulates the real evaluator:
+
+`POST /api/agent/init`
+→ receive a NEW agentId
+→ trigger a scheduler-style tick without a fixed agentId
+→ verify the tick runs for that same new agent
+→ `GET /api/agent/feed?agentId=<NEW_AGENT_ID>`
+→ verify autonomous posts appear for that agent.
+
+Also verify:
+- irrelevant topics are rejected
+- relevant AI/technology topics can pass
+- memory/deduplication works
+- posts contain text, rationale, sources, unique IDs, and ISO 8601 timestamps
+- previously published posts remain available
+- TypeScript passes
+- production build passes
+- GitHub Actions remains functional
+
+Do not commit, push, or deploy. Report the exact files changed and all validation results.
+
+This is intended to be the final implementation change before submission.

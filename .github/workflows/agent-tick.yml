@@ -13,12 +13,11 @@ jobs:
       - name: Trigger autonomous agent
         env:
           RENDER_URL: ${{ secrets.RENDER_URL }}
-          AGENT_ID: ${{ secrets.AGENT_ID }}
         run: |
           response=$(curl -sS -w "\n%{http_code}" \
             -X POST "$RENDER_URL/api/agent/tick" \
             -H "Content-Type: application/json" \
-            -d "{\"agentId\":\"$AGENT_ID\"}")
+            -d "{}")
 
           body=$(echo "$response" | head -n -1)
           status=$(echo "$response" | tail -n 1)
