@@ -59,6 +59,14 @@ export default async function PostDetailPage({
   // Gather facts from all Source records
   const allFacts = post.srcs.flatMap((s) => parseFacts(s.factsExtracted));
 
+  function cleanCSS(text: string) {
+    if (!text) return "";
+    let cleaned = text.replace(/\.[a-zA-Z0-9_-]+\s*\{[^}]*\}/g, "");
+    cleaned = cleaned.replace(/\/\*!sc\*\//g, "");
+    cleaned = cleaned.replace(/^[a-z-]+:\s*[^;]+;/gm, "");
+    return cleaned.trim();
+  }
+
   return (
     <>
       {/* Back link */}
@@ -86,7 +94,7 @@ export default async function PostDetailPage({
               <span>📄</span> Generated Content
             </div>
             <div style={{ fontSize: 14.5, color: "var(--text-primary)", lineHeight: 1.75, whiteSpace: "pre-wrap" }}>
-              {post.text}
+              {cleanCSS(post.text)}
             </div>
           </div>
 
@@ -97,7 +105,7 @@ export default async function PostDetailPage({
                 <span>💡</span> Agent Rationale
               </div>
               <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
-                {post.rationale || "No rationale provided."}
+                {cleanCSS(post.rationale) || "No rationale provided."}
               </p>
             </div>
             {post.topic && (
@@ -136,7 +144,7 @@ export default async function PostDetailPage({
                 {allFacts.map((fact, i) => (
                   <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                     <span style={{ color: "var(--status-published)", fontSize: 14, flexShrink: 0, marginTop: 1 }}>✓</span>
-                    <span style={{ fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>{fact}</span>
+                    <span style={{ fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>{cleanCSS(fact)}</span>
                   </div>
                 ))}
               </div>

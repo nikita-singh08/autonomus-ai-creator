@@ -55,8 +55,10 @@ function extractSnippet(item: Parser.Item): string | undefined {
 
   if (!raw) return undefined;
 
-  // Strip HTML tags (rss-parser may leave some in `content`)
-  const stripped = raw.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  // Strip script and style blocks entirely before stripping other HTML tags
+  let stripped = raw.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, " ");
+  // Strip remaining HTML tags (rss-parser may leave some in `content`)
+  stripped = stripped.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
   return stripped.slice(0, 300) || undefined;
 }
 

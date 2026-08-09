@@ -53,6 +53,14 @@ export default async function ContentPage() {
     try { return new URL(url).hostname.replace("www.", ""); } catch { return url; }
   }
 
+  function cleanCSS(text: string) {
+    if (!text) return "";
+    let cleaned = text.replace(/\.[a-zA-Z0-9_-]+\s*\{[^}]*\}/g, "");
+    cleaned = cleaned.replace(/\/\*!sc\*\//g, "");
+    cleaned = cleaned.replace(/^[a-z-]+:\s*[^;]+;/gm, "");
+    return cleaned.trim();
+  }
+
   const agentInitials = agent?.persona?.name
     ? agent.persona.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()
     : "AG";
@@ -114,7 +122,7 @@ export default async function ContentPage() {
 
                 {/* Post text */}
                 <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", lineHeight: 1.6, marginBottom: 16 }}>
-                  {post.text}
+                  {cleanCSS(post.text)}
                 </div>
 
                 {/* Rationale + Sources grid */}
@@ -125,7 +133,7 @@ export default async function ContentPage() {
                       <span className="stat-label" style={{ marginBottom: 0 }}>Rationale</span>
                     </div>
                     <p style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.55 }}>
-                      {post.rationale || "No rationale provided."}
+                      {cleanCSS(post.rationale) || "No rationale provided."}
                     </p>
                   </div>
                   <div style={{ background: "var(--bg-elevated)", borderRadius: "var(--radius-md)", padding: "12px 14px", border: "1px solid var(--border)" }}>
