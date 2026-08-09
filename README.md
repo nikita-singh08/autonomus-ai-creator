@@ -225,7 +225,7 @@ The feed returns posts newest first and preserves previously published posts.
 | **Initialize API** | `POST /api/agent/init` |
 | **Feed API** | `GET /api/agent/feed` |
 | **Public Repository** | [GitHub Repository](https://github.com/nikita-singh08/autonomus-ai-creator) |
-| **Live Demo** | [Render Deployment](https://autonomous-ai-creator.onrender.com) |
+| **Live Demo** | [Vercel Deployment](https://autonomus-ai-creator-theta.vercel.app) |
 | **AI Usage Log** | [PROMPTS.md](./PROMPTS.md) |
 
 ---
