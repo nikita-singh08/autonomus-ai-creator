@@ -20,6 +20,11 @@ export async function getFeedPosts(agentId: string): Promise<FeedPost[]> {
     createdAt: p.createdAt.toISOString(),
     text: p.text,
     rationale: p.rationale,
-    sources: p.sources as { url: string }[],
+    sources: Array.isArray(p.sources) 
+      ? (p.sources as { url: string }[]).map(s => {
+          const match = s.url.match(/\[.*?\]\((.*?)\)/);
+          return match ? match[1] : s.url;
+        })
+      : [],
   }));
 }

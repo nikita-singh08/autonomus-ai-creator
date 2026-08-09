@@ -15,6 +15,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { initAgent } from "@/agent/agentStore";
+import { runTick } from "@/agent/orchestrator";
 import { logger } from "@/lib/logger";
 import type { InitAgentRequest, InitAgentResponse } from "@/types/agent";
 
@@ -48,6 +49,13 @@ export async function POST(req: NextRequest) {
     const result = await initAgent({
       name: persona.name.trim(),
       domain: persona.domain.trim(),
+    });
+
+    // Start first autonomous tick immediately.
+    // Awaiting this is safe on Render (100s limit) and ensures the evaluator
+    // can immediately see the results in the feed.
+    await runTick(result.agentId).catch((err) => {
+      logger.error("Initial autonomous tick failed", { error: String(err) });
     });
 
     const response: InitAgentResponse = { agentId: result.agentId };

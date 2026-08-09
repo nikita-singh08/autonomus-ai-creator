@@ -140,7 +140,7 @@ export interface FeedPost {
   createdAt: string;
   text: string;
   rationale: string;
-  sources: { url: string }[];
+  sources: string[];
 }
 
 export interface FeedResponse {
